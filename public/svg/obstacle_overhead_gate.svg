@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%" id="obstacle_overhead_gate">
+  <!-- Steel Uprights -->
+  <rect x="50" y="60" width="30" height="420" fill="#334155" stroke="#0f172a" stroke-width="3"/>
+  <rect x="432" y="60" width="30" height="420" fill="#334155" stroke="#0f172a" stroke-width="3"/>
+  <!-- Overhead Clearance Header -->
+  <rect x="40" y="70" width="432" height="70" rx="6" fill="#facc15" stroke="#0f172a" stroke-width="4"/>
+  <!-- Black Diagonal Hazard Stripes -->
+  <polygon points="50,70 85,70 40,140 40,140" fill="#0f172a"/>
+  <polygon points="120,70 155,70 85,140 50,140" fill="#0f172a"/>
+  <polygon points="190,70 225,70 155,140 120,140" fill="#0f172a"/>
+  <polygon points="260,70 295,70 225,140 190,140" fill="#0f172a"/>
+  <polygon points="330,70 365,70 295,140 260,140" fill="#0f172a"/>
+  <polygon points="400,70 435,70 365,140 330,140" fill="#0f172a"/>
+  <polygon points="470,70 472,70 435,140 400,140" fill="#0f172a"/>
+  <!-- Height Clearance Plaque -->
+  <rect x="186" y="85" width="140" height="38" rx="4" fill="#0f172a" stroke="#ffffff" stroke-width="1.5"/>
+  <text x="256" y="110" font-family="sans-serif" font-size="16" font-weight="bold" fill="#fef08a" text-anchor="middle">MAX 1.8M ⬇</text>
+</svg>

@@ -1,0 +1,221 @@
+{
+  "conventions": {
+    "heroClips": "idle/read/run/sprint/jump/land/slide/dodge/collect/stumble/gameover/jetpack/glideboard",
+    "heroFacing": "-Z (away from camera), ~1.7 units tall, feet at y=0"
+  },
+  "generated": "2026-10-13",
+  "note": "GLB integration manifest for MUSLIYARKUTTI: MALABAR RUNNER. Every slot currently has file: null, so ModelLoader resolves each to its documented procedural fallback. When a real, rigged GLB is supplied: set that slot's `file` to the GLB path under public/models/, keep the slot name, and list per-clip files under `animations` if clips ship separately. No code changes are needed \u2014 only this file. Do NOT invent filenames here: a slot with no real file stays file: null.",
+  "slots": {
+    "academyGate": {
+      "fallback": "AcademyGate",
+      "fallbackModule": "src/game/AcademyGate.js",
+      "file": null,
+      "status": "missing \u2014 procedural fallback active"
+    },
+    "academy_campus": {
+      "fallback": "LandmarkManager",
+      "fallbackModule": "src/game/LandmarkManager.js",
+      "file": null,
+      "status": "missing \u2014 procedural fallback active"
+    },
+    "auto_rickshaw": {
+      "fallback": "ObstacleManager",
+      "fallbackModule": "src/game/ObstacleManager.js",
+      "file": null,
+      "status": "missing \u2014 procedural fallback active"
+    },
+    "bicycle": {
+      "fallback": null,
+      "fallbackModule": null,
+      "file": null,
+      "status": "missing \u2014 no procedural variant built yet; slot reserved"
+    },
+    "bus": {
+      "fallback": "ObstacleManager",
+      "fallbackModule": "src/game/ObstacleManager.js",
+      "file": "models/fire-truck.glb",
+      "status": "integrated Oct 13 2026 \u2014 fari-supplied Sketchfab stylized fire truck (arunangshubanerjee), static"
+    },
+    "busstop": {
+      "fallback": "LandmarkManager",
+      "fallbackModule": "src/game/LandmarkManager.js",
+      "file": null,
+      "status": "missing \u2014 procedural fallback active"
+    },
+    "car": {
+      "fallback": "WorldBuilder",
+      "fallbackModule": "src/game/WorldBuilder.js",
+      "file": "models/police-car.glb",
+      "status": "integrated Oct 13 2026 \u2014 fari-supplied Sketchfab stylized police car (arunangshubanerjee), static"
+    },
+    "edumart": {
+      "fallback": "LandmarkManager",
+      "fallbackModule": "src/game/LandmarkManager.js",
+      "file": null,
+      "status": "missing \u2014 procedural fallback active"
+    },
+    "hero": {
+      "animations": {
+        "collect": {
+          "file": null,
+          "status": "missing \u2014 procedural fallback active"
+        },
+        "dodge": {
+          "file": null,
+          "status": "missing \u2014 procedural fallback active"
+        },
+        "gameover": {
+          "file": null,
+          "status": "missing \u2014 procedural fallback active"
+        },
+        "glideboard": {
+          "file": null,
+          "status": "missing \u2014 procedural fallback active"
+        },
+        "idle": {
+          "file": null,
+          "status": "missing \u2014 procedural fallback active"
+        },
+        "jetpack": {
+          "file": null,
+          "status": "missing \u2014 procedural fallback active"
+        },
+        "jump": {
+          "file": null,
+          "status": "missing \u2014 procedural fallback active"
+        },
+        "land": {
+          "file": null,
+          "status": "missing \u2014 procedural fallback active"
+        },
+        "read": {
+          "file": null,
+          "status": "missing \u2014 procedural fallback active"
+        },
+        "run": {
+          "file": null,
+          "status": "missing \u2014 procedural fallback active"
+        },
+        "slide": {
+          "file": null,
+          "status": "missing \u2014 procedural fallback active"
+        },
+        "sprint": {
+          "file": null,
+          "status": "missing \u2014 procedural fallback active"
+        },
+        "stumble": {
+          "file": null,
+          "status": "missing \u2014 procedural fallback active"
+        }
+      },
+      "fallback": "PlayerAvatar",
+      "fallbackModule": "src/game/PlayerAvatar.js",
+      "file": null,
+      "status": "missing \u2014 procedural fallback active"
+    },
+    "lampPost": {
+      "fallback": "WorldBuilder",
+      "fallbackModule": "src/game/WorldBuilder.js",
+      "file": null,
+      "status": "missing \u2014 procedural fallback active"
+    },
+    "masjid": {
+      "fallback": "LandmarkManager",
+      "fallbackModule": "src/game/LandmarkManager.js",
+      "file": null,
+      "status": "missing \u2014 procedural fallback active"
+    },
+    "motorcycle": {
+      "fallback": null,
+      "fallbackModule": null,
+      "file": null,
+      "status": "missing \u2014 no procedural variant built yet; slot reserved"
+    },
+    "palm": {
+      "fallback": "WorldBuilder",
+      "fallbackModule": "src/game/WorldBuilder.js",
+      "file": null,
+      "status": "missing \u2014 procedural fallback active"
+    },
+    "pedestrian_a": {
+      "fallback": "WorldBuilder",
+      "fallbackModule": "src/game/WorldBuilder.js",
+      "file": null,
+      "status": "missing \u2014 procedural fallback active"
+    },
+    "pedestrian_b": {
+      "fallback": "WorldBuilder",
+      "fallbackModule": "src/game/WorldBuilder.js",
+      "file": null,
+      "status": "missing \u2014 procedural fallback active"
+    },
+    "shaytan": {
+      "fallback": "ShaytanPursuit",
+      "fallbackModule": "src/game/ShaytanPursuit.js",
+      "file": null,
+      "status": "missing \u2014 procedural fallback active"
+    },
+    "shop_family": {
+      "fallback": "LandmarkManager",
+      "fallbackModule": "src/game/LandmarkManager.js",
+      "file": null,
+      "status": "missing \u2014 procedural fallback active"
+    },
+    "shop_juicify": {
+      "fallback": "LandmarkManager",
+      "fallbackModule": "src/game/LandmarkManager.js",
+      "file": null,
+      "status": "missing \u2014 procedural fallback active"
+    },
+    "shop_laban": {
+      "fallback": "LandmarkManager",
+      "fallbackModule": "src/game/LandmarkManager.js",
+      "file": null,
+      "status": "missing \u2014 procedural fallback active"
+    },
+    "shop_myg": {
+      "fallback": "LandmarkManager",
+      "fallbackModule": "src/game/LandmarkManager.js",
+      "file": null,
+      "status": "missing \u2014 procedural fallback active"
+    },
+    "shop_turkish": {
+      "fallback": "LandmarkManager",
+      "fallbackModule": "src/game/LandmarkManager.js",
+      "file": null,
+      "status": "missing \u2014 procedural fallback active"
+    },
+    "car_sport": {
+      "file": "models/mustang.glb",
+      "fallback": "WorldBuilder",
+      "fallbackModule": "src/game/WorldBuilder.js",
+      "status": "integrated Oct 13 2026 \u2014 fari-supplied yellow mustang-style car, static, separate wheel nodes"
+    },
+    "windmill": {
+      "file": "models/windmill.glb",
+      "fallback": "WorldBuilder",
+      "fallbackModule": "src/game/WorldBuilder.js",
+      "status": "integrated Oct 13 2026 \u2014 fari-supplied windmill, terrain planes stripped (asset prep), static"
+    },
+    "shaytan_reaper": {
+      "file": "models/shaytan-reaper.glb",
+      "fallback": "ShaytanPursuit",
+      "fallbackModule": "src/game/ShaytanPursuit.js",
+      "status": "integrated Oct 13 2026 \u2014 fari-supplied grim reaper (pixellabs) as selectable Shaytan variant; static mesh, hover-apparition treatment, lazy-loaded"
+    },
+    "shaytan_alt": {
+      "file": "models/shaytan-alt.glb",
+      "fallback": "ShaytanPursuit",
+      "fallbackModule": "src/game/ShaytanPursuit.js",
+      "status": "integrated Oct 13 2026 \u2014 fari-supplied alternate Shaytan; decimated 212k\u219238k tris for bloom/GPU compatibility (original kept as shaytan-alt-orig-212k.glb)"
+    },
+    "hero_mascot": {
+      "file": "models/hero-mascot.glb",
+      "fallback": null,
+      "fallbackModule": null,
+      "status": "integrated Oct 14 2026 \u2014 fari-supplied hero GLB as title-screen greeting mascot; static 500k-tri mesh (GLB-only, no procedural fallback), gentle group-level bobbing, hidden during gameplay"
+    }
+  },
+  "version": 1
+}

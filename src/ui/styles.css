@@ -1,0 +1,225 @@
+/* Base styles for MUSLIYARKUTTI: MALABAR RUNNER.
+   Engine-owned shell. The UI workstream adds src/ui/screens.css (imported by UI.js).
+   Palette: --navy #1A1A2E, --ivory #faf7f0, --gold #FFD700, --cyan #2979FF. */
+
+:root {
+  --navy: #1a1a2e;
+  --navy-deep: #16213e;
+  --ivory: #fafafa;
+  --gold: #ffd700;
+  --gold-deep: #8b6914;
+  --cyan: #2979ff;
+  --cyan-deep: #1565c0;
+  --danger: #e4000f;
+  --success: #00c853;
+  --radius: 18px;
+  --font-stack: "Trebuchet MS", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--navy);
+  color: var(--ivory);
+  font-family: var(--font-stack);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+#game {
+  display: block;
+  width: 100vw;
+  height: 100dvh;
+  touch-action: none;
+  outline: none;
+}
+
+/* UI overlay: clicks pass through except on interactive children. */
+#ui {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  color: var(--ivory);
+  font-family: var(--font-stack);
+}
+
+#ui button,
+#ui a,
+#ui input,
+#ui select,
+#ui textarea,
+#ui [data-interactive] {
+  pointer-events: auto;
+}
+
+#ui button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* HUD must never cover the road centre-bottom; screens keep to top bar + corners. */
+#ui .hud-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #ui *,
+  #ui *::before,
+  #ui *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Subtitles (Oct 14, 2026): bottom-center, translucent dark bg, readable */
+.subtitle-display {
+  position: absolute;
+  bottom: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 80%;
+  padding: 0.6em 1.2em;
+  background: rgba(10, 16, 32, 0.72);
+  color: #fff8e8;
+  font-size: clamp(15px, 2.4vw, 22px);
+  line-height: 1.4;
+  text-align: center;
+  border-radius: 8px;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+  z-index: 60;
+}
+.subtitle-display.visible { opacity: 1; }
+.subtitle-display.hidden { display: none; }
+
+/* Skip intro button (Oct 14, 2026): upper-right, unobtrusive */
+.skip-intro-hint {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  padding: 0.45em 0.9em;
+  background: rgba(10, 16, 32, 0.62);
+  color: #FFD700;
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  border-radius: 6px;
+  font-size: clamp(11px, 1.6vw, 14px);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.25s ease, background 0.25s ease;
+  z-index: 61;
+  user-select: none;
+}
+.skip-intro-hint:hover { opacity: 1; background: rgba(10, 16, 32, 0.85); }
+.skip-intro-hint.hidden { display: none; }
+
+/* Tutorial choice (Oct 14, 2026) */
+.tutorial-choice {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 12, 28, 0.78);
+  z-index: 70;
+}
+.tutorial-choice.hidden { display: none; }
+.tutorial-choice-panel {
+  background: #101a35;
+  border: 2px solid #FFD700;
+  border-radius: 14px;
+  padding: 2em 2.4em;
+  max-width: min(92vw, 480px);
+  text-align: center;
+  color: #fff8e8;
+}
+.tutorial-choice-panel h2 {
+  color: #FFD700;
+  font-size: clamp(18px, 3vw, 26px);
+  margin: 0 0 0.6em;
+  letter-spacing: 0.04em;
+}
+.tutorial-desc {
+  font-size: clamp(13px, 2vw, 16px);
+  line-height: 1.5;
+  opacity: 0.9;
+  margin: 0 0 1.4em;
+}
+.tutorial-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8em;
+}
+
+/* Tutorial step prompts (Oct 14, 2026) */
+.tutorial-prompt {
+  position: absolute;
+  bottom: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 86%;
+  padding: 0.7em 1.4em;
+  background: rgba(10, 16, 32, 0.85);
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  border-radius: 10px;
+  color: #fff8e8;
+  font-size: clamp(15px, 2.6vw, 22px);
+  text-align: center;
+  z-index: 62;
+  pointer-events: none;
+}
+.tutorial-prompt.hidden { display: none; }
+.tutorial-skip {
+  position: absolute;
+  bottom: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.4em 1em;
+  background: transparent;
+  border: 1px solid rgba(212, 175, 55, 0.6);
+  border-radius: 6px;
+  color: #FFD700;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  z-index: 63;
+}
+.tutorial-skip.hidden { display: none; }
+
+/* Rounded arcade styling for in-run prompts and the first-play tutorial. */
+.subtitle-display,
+.tutorial-prompt,
+.tutorial-skip,
+.skip-intro-hint {
+  border-radius: 16px;
+  border-color: rgba(255, 215, 0, 0.52);
+}
+.tutorial-choice-panel {
+  border: 2px solid rgba(255, 215, 0, 0.72);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(41, 121, 255, 0.2), transparent 45%),
+    linear-gradient(155deg, #223052, #16213e);
+  box-shadow: 0 8px 0 rgba(7, 12, 28, 0.8), 0 24px 64px rgba(0, 0, 0, 0.5);
+}
+.tutorial-choice-panel h2 { color: #ffd700; }
+.tutorial-prompt { background: rgba(22, 33, 62, 0.94); }
+.tutorial-skip,
+.skip-intro-hint { color: #fff3a6; background: rgba(22, 33, 62, 0.88); }
+.subtitle-display { background: rgba(22, 33, 62, 0.94); }

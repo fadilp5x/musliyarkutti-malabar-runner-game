@@ -1,0 +1,21 @@
+{
+  "name": "musliyarkutti-malabar-runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^11.1.6",
+    "@netlify/functions": "^6.0.3",
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0",
+    "vitest": "^2.0.0"
+  }
+}

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1a2e" />
+  <link rel="icon" href="data:," />
+  <title>Musliyarkutti: Malabar Runner</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #0b1a2e;
+      touch-action: none;
+      overscroll-behavior: none;
+    }
+    #game { display: block; width: 100vw; height: 100vh; touch-action: none; }
+    #ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="ui"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
