@@ -696,6 +696,35 @@
   .mmr-ui .btn { animation: none !important; transition: none !important; }
 }
 
+/* Malabar Heritage Modern finish: teak, emerald, brass and parchment. */
+.mmr-ui { color: var(--color-cloud); font-family: var(--font-ui); }
+.mmr-ui .screen { background: color-mix(in srgb, var(--color-ink) 62%, transparent); backdrop-filter: blur(3px); }
+.mmr-ui #screen-tap { background: color-mix(in srgb, var(--color-ink) 38%, transparent); }
+.mmr-ui .panel, .mmr-ui .page-shell, .mmr-ui .goal-card,
+.mmr-ui .credits-section, .mmr-ui .setting-row, .mmr-ui .voucher-card {
+  color: var(--color-ink); background: var(--color-cloud); border-color: var(--color-gold-600);
+}
+.mmr-ui .panel { box-shadow: 0 8px 0 var(--color-ink), var(--shadow-card); }
+.mmr-ui h1.game-title, .mmr-ui h2.panel-title { color: var(--color-cloud); text-shadow: 0 3px 0 var(--color-ink), 0 5px 0 var(--color-gold-600); }
+.mmr-ui h1.game-title .accent, .mmr-ui .newbest, .mmr-ui .stat-cell .value.gold { color: var(--color-gold-400); }
+.mmr-ui .btn { color: var(--color-cloud); background: var(--color-green-500); box-shadow: 0 4px 0 var(--color-green-700); }
+.mmr-ui .btn.secondary { color: var(--color-ink); background: var(--color-cloud); border: 2px solid var(--color-green-700); box-shadow: 0 4px 0 var(--color-green-700); }
+.mmr-ui .btn.danger { color: var(--color-cloud); background: var(--color-coral-700); box-shadow: 0 4px 0 var(--color-ink); }
+.mmr-ui .btn:focus-visible, .mmr-ui .hud-btn:focus-visible { outline-color: var(--color-gold-400); }
+.mmr-ui .hud-stat { position: relative; overflow: hidden; color: var(--color-ink); background: color-mix(in srgb, var(--color-cloud) 96%, transparent); border: 2px solid var(--color-cloud); }
+.mmr-ui .hud-stat::before, .mmr-ui .hud-stat::after { position: absolute; color: var(--color-gold-600); font-size: 10px; line-height: 1; pointer-events: none; }
+.mmr-ui .hud-stat::before { content: '◇'; top: 3px; left: 4px; }
+.mmr-ui .hud-stat::after { content: '◇'; right: 4px; bottom: 3px; }
+.mmr-ui .hud-stat .label, .mmr-ui .hud-stat .value { color: var(--color-ink); }
+.mmr-ui .hud-stat.coins .value { color: var(--color-gold-600); }
+.mmr-ui.party-race-active #mmr-hud { padding-top: calc(60px + env(safe-area-inset-top)); }
+.mmr-ui .title-stats-pill { color: var(--color-ink); background: var(--color-cloud); border-color: var(--color-gold-600); }
+.mmr-ui .title-stats-pill > span + span::before { color: var(--color-gold-600); }
+.mmr-ui .goal-title, .mmr-ui .page-title, .mmr-ui .credits-section h3 { color: var(--color-green-700); }
+.mmr-ui .goal-progress, .mmr-ui .goal-progress > i { background-color: var(--color-gold-400); }
+.mmr-ui .story-button { color: var(--color-cloud); background: var(--color-green-500); border-color: var(--color-gold-400); }
+.mmr-ui .skip-intro-hint { color: var(--color-ink); background: var(--color-gold-400); }
+
 .mmr-ui.reduced-motion .screen,
 .mmr-ui.reduced-motion .panel,
 .mmr-ui.reduced-motion .tap-hint,
@@ -1750,6 +1779,37 @@
 .mmr-ui .title-stats-pill { display: flex; min-height: 40px; align-items: center; justify-content: center; gap: var(--space-2); padding: var(--space-1) var(--space-3); border: 2px solid var(--color-white); border-radius: var(--radius-pill); color: var(--color-white); background: color-mix(in srgb, var(--color-ink) 84%, transparent); font-size: clamp(.75rem, 2vw, .95rem); font-weight: 700; }
 .mmr-ui .title-stats-pill > span + span::before { content: '·'; margin-right: var(--space-2); color: var(--color-white); }
 .mmr-ui .title-play { animation: tap-pulse 1.7s ease-in-out infinite; }
+.mmr-ui .story-button {
+  position: absolute; top: max(var(--space-3), env(safe-area-inset-top)); left: 50%; z-index: var(--z-overlay);
+  display: inline-flex; min-width: 48px; min-height: 48px; align-items: center; justify-content: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-4); border: 2px solid var(--color-white); border-radius: var(--radius-pill);
+  color: var(--color-white); background: color-mix(in srgb, var(--color-ink) 82%, transparent); box-shadow: var(--shadow-card);
+  font: 700 1rem/1 var(--font-ui); letter-spacing: .12em; -webkit-text-stroke: .35px var(--color-ink); text-shadow: 0 2px 0 var(--color-gold-600);
+  transform: translateX(-50%); cursor: pointer; touch-action: manipulation;
+}
+.mmr-ui #screen-tap .story-button { position: absolute; top: max(var(--space-3), env(safe-area-inset-top)); right: auto; left: 50%; z-index: var(--z-overlay); transform: translateX(-50%); }
+.mmr-ui .story-button:focus-visible { outline: 3px solid var(--color-gold-400); outline-offset: 3px; }
+.mmr-ui .story-mark { width: 30px; height: 30px; flex: 0 0 auto; overflow: visible; color: var(--color-gold-400); }
+.mmr-ui .story-mark .runner-head, .mmr-ui .story-runner-mark .runner-head { fill: currentColor; }
+.mmr-ui .story-mark .runner-body, .mmr-ui .story-runner-mark .runner-body { fill: currentColor; }
+.mmr-ui .story-mark .runner-limb, .mmr-ui .story-runner-mark .runner-limb { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 5; }
+.mmr-ui .story-transition-layer { position: absolute; inset: 0; z-index: var(--z-modal); overflow: hidden; pointer-events: none; }
+.mmr-ui #screen-tap .story-transition-layer { position: absolute; inset: 0; z-index: var(--z-modal); }
+.mmr-ui .story-runner-mark { position: absolute; top: 50%; left: 0; width: clamp(56px, 12vw, 92px); height: auto; color: var(--color-gold-400); transform: translate(-120%, -50%); animation: story-sprint 680ms cubic-bezier(.25,.7,.35,1) forwards; }
+.mmr-ui .story-flash, .mmr-ui .story-fade { position: absolute; inset: 0; opacity: 0; }
+.mmr-ui .story-flash { background: radial-gradient(circle at center, var(--color-gold-400), color-mix(in srgb, var(--color-gold-400) 52%, transparent) 34%, transparent 72%); animation: story-flash 260ms ease-out 620ms both; }
+.mmr-ui .story-fade { background: var(--color-ink); animation: story-fade 280ms ease-in 840ms both; }
+.mmr-ui .story-starting > :not(.tap-bg):not(.story-transition-layer) { pointer-events: none; }
+.mmr-ui .story-starting .story-button, .mmr-ui .story-starting .title-play { opacity: 0; }
+@keyframes story-sprint { to { transform: translate(115vw, -50%); } }
+@keyframes story-flash { 30% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes story-fade { to { opacity: 1; } }
+.mmr-ui .skip-intro-hint {
+  position: fixed; top: max(var(--space-3), env(safe-area-inset-top)); right: max(var(--space-3), env(safe-area-inset-right)); z-index: var(--z-modal);
+  min-width: 48px; min-height: 48px; padding: var(--space-2) var(--space-4); border: 2px solid var(--color-white); border-radius: var(--radius-pill);
+  color: var(--color-ink); background: var(--color-gold-400); box-shadow: var(--shadow-card); font: 700 1rem/1.2 var(--font-ui); cursor: pointer;
+}
+.mmr-ui .skip-intro-hint:focus-visible { outline: 3px solid var(--color-white); outline-offset: 3px; }
 .mmr-ui #screen-tap { justify-content: center; gap: var(--space-3); padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
 .mmr-ui #screen-tap .game-title { max-width: 100%; font-size: clamp(1.55rem, min(5.4vw, 7vh), 3.7rem); line-height: 1.02; }
 .mmr-ui .corner-links { width: min(560px, calc(100vw - 2 * var(--space-3))); grid-template-columns: repeat(6, minmax(0, 1fr)); }
@@ -1799,9 +1859,11 @@
   .mmr-ui #screen-tap .game-title { font-size: clamp(1.35rem, 7vw, 2.3rem); }
   .mmr-ui .corner-links { bottom: max(var(--space-1), env(safe-area-inset-bottom)); width: calc(100vw - 2 * var(--space-2)); gap: 2px; }
   .mmr-ui .corner-links .btn { min-height: 52px; padding: var(--space-1) 2px; font-size: clamp(.47rem, 2.2vw, .65rem); }
+  .mmr-ui #screen-tap .story-button { top: max(var(--space-2), env(safe-area-inset-top)); }
 }
 @media (prefers-reduced-motion: reduce) {
   .mmr-ui .screen, .mmr-ui .panel, .party-layer, .party-card { animation: none !important; transition: opacity var(--motion-base) ease !important; }
   .mmr-ui .loading-start { animation: none !important; }
   .mmr-ui .title-play, .party-leaderboard-skeleton { animation: none !important; }
+  .mmr-ui .story-runner-mark, .mmr-ui .story-flash, .mmr-ui .story-fade { animation: none !important; }
 }

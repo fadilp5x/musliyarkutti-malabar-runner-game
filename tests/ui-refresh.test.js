@@ -4,12 +4,16 @@ import { readFileSync } from 'node:fs';
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
 describe('title and shared screen refresh', () => {
-  it('keeps title tap-anywhere play, moves help into settings, and uses compact navigation', () => {
+  it('keeps title play explicit, moves help into settings, and uses compact navigation', () => {
     const menu = read('src/ui/MenuController.js');
     const party = read('src/party/PartyRace.js');
     expect(menu).toContain("playButton.textContent = 'PLAY'");
-    expect(menu).toContain("el.addEventListener('click', () =>");
-    expect(menu).toContain('this.game.startRun?.()');
+    expect(menu).toContain("playButton.addEventListener('click', this.click(() => this.game.startRun?.({ story: 'auto' })));");
+    expect(menu).toContain("storyButton.addEventListener('click', this.click(() => this._playStoryTransition()));");
+    const title = menu.slice(menu.indexOf('  _buildTap() {'), menu.indexOf('  // Best score'));
+    expect(title).not.toContain("el.addEventListener('click'");
+    expect(title).toContain('this.game.startRun?.({ story: \'force\' })');
+    expect(title).toContain("this.ui.show(screen)");
     expect(menu).not.toContain("summary.textContent = 'How to play'");
     expect(menu).toContain("guideTitle.textContent = 'How to play'");
     expect(menu).not.toContain("mk('Missions', 'missions')");
@@ -17,6 +21,8 @@ describe('title and shared screen refresh', () => {
     expect(menu).toContain("mk('Credits', 'credits')");
     expect(party).toContain("mainActions?.append(this.trigger)");
     expect(party).toContain("corner?.prepend(this.leaderboardTrigger)");
+    expect(party).toContain('this.game.startPartyRace?.');
+    expect(party).not.toContain('this.game.startRun?.(');
   });
 
   it('uses the shared sticky page shell and waits for loading before the tap-to-start action', () => {

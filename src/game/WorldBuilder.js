@@ -384,11 +384,12 @@ function roadWordTexture(word) {
 function roadWordDecal(word, w = 1.7) {
   const m = new THREE.Mesh(
     planeGeo(w, w),
-    new THREE.MeshBasicMaterial({ map: roadWordTexture(word), transparent: true, alphaTest: 0.35 })
+    new THREE.MeshBasicMaterial({ map: roadWordTexture(word), transparent: true, alphaTest: 0.35,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, depthWrite: false })
   );
   m.rotation.x = -Math.PI / 2;
   m.rotation.z = Math.PI / 2; // spin in-plane: word runs along the road
-  m.position.y = 0.025;
+  m.position.y = 0.02;
   return m;
 }
 
@@ -1458,7 +1459,7 @@ export class WorldBuilder {
 
     for (const seg of this.segments) {
       seg.position.z += dz;
-      if (seg.position.z > 45) seg.position.z -= WRAP; // 45 = 30 + half segment
+      if (seg.position.z > 45) seg.position.z = Math.round(seg.position.z - WRAP); // exact integer seam after wrap
     }
     for (const o of this.scenery) {
       o.position.z += dz;

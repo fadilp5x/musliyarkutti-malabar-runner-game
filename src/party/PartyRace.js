@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { PlayerAvatar } from '../game/PlayerAvatar.js';
 import { ShieldBubble } from '../game/ShieldBubble.js';
 import { LANES } from '../game/PlayerController.js';
@@ -21,6 +22,10 @@ export const PARTY_PROGRESS_INTERVAL_MS = 400;
 export const PARTY_POLL_INTERVAL_MS = 1500;
 export const PARTY_HEARTBEAT_INTERVAL_MS = 6000;
 const MAX_POLL_BACKOFF_MS = 5000;
+export const raceProgressPercent = (distance, leaderDistance) => leaderDistance > 0
+  ? clamp((Math.max(0, Number(distance) || 0) / leaderDistance) * 100, 0, 100)
+  : 0;
+export const roomShareUrl = (code) => `https://malabarrunner28.netlify.app/?room=${encodeURIComponent(String(code || '').toUpperCase())}`;
 
 export class PartyRace {
   constructor(game, root) {
@@ -58,10 +63,12 @@ export class PartyRace {
     this.chatMessages = [];
     this.chatRoomKey = null;
     this._remoteRoundKey = null;
+    this.lastPartyEventId = null;
     this._buildUI();
     this._connect();
     this.game.partyRace = this;
     this.game.events?.on?.('statechange', (state) => this._onGameState(state));
+    this.game.events?.on?.('powerup', () => this._broadcastPartyEvent('boost'));
     this._onVisibilityChange = () => this._handleVisibilityChange();
     document.addEventListener('visibilitychange', this._onVisibilityChange);
     this._raf = 0;
@@ -83,7 +90,7 @@ export class PartyRace {
           <p class="party-copy">Create a room and share its code. Race three rounds on the original 3D course; total distance wins, with coins breaking ties.</p>
           <div class="party-fields">
             <label class="party-field">Your name<input data-name maxlength="16" autocomplete="nickname" placeholder="Runner name"></label>
-            <label class="party-field">Room code<input data-code maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="Enter a friend's code"></label>
+            <label class="party-field">Room code<input data-code maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="Enter a friend's 4-letter code"></label>
           </div>
           <div class="party-actions"><button class="btn" data-create>Create room</button><button class="btn secondary" data-join>Join room</button></div>
           <div class="party-status" data-status>Connecting to the race server…</div>
@@ -91,7 +98,8 @@ export class PartyRace {
         </div>
         <div class="party-view hidden" data-view="lobby">
           <div class="party-kicker">Waiting room</div><h2 class="party-title">Race lobby</h2>
-          <p class="party-copy">Share the code, then run three rounds. Total distance wins; race coins break ties.</p><div class="party-code" data-room-code>------</div>
+          <p class="party-copy">Share the code, then run three rounds. Total distance wins; race coins break ties.</p><button type="button" class="party-code" data-room-code aria-label="Copy room code">------</button>
+          <div class="party-share-actions"><button type="button" class="party-share-button" data-share-whatsapp>WhatsApp</button><button type="button" class="party-share-button" data-copy-link>Copy Link</button></div><div class="party-share-status" data-share-status aria-live="polite"></div>
           <div class="party-roster" data-roster></div>
           <div class="party-actions"><button class="btn" data-start>Start race</button><button class="btn secondary" data-leave>Leave room</button></div>
           <div class="party-status" data-lobby-status>At least 2 players are needed to start.</div>
@@ -131,6 +139,8 @@ export class PartyRace {
     this.remoteEdgeList = document.createElement('div');
     this.remoteEdgeList.className = 'party-remote-edges';
     this.remoteEdgeList.setAttribute('aria-live', 'polite');
+    this.remoteNameplates = document.createElement('div');
+    this.remoteNameplates.className = 'party-remote-nameplates';
     this.chatWidget = document.createElement('aside');
     this.chatWidget.className = 'party-chat hidden';
     this.chatWidget.innerHTML = `
@@ -139,6 +149,8 @@ export class PartyRace {
         <header class="party-chat-header"><strong>Crew chat</strong><button class="party-chat-close" type="button" data-chat-close aria-label="Close chat">×</button></header>
         <div class="party-chat-messages" data-chat-messages aria-live="polite"></div>
         <div class="party-chat-phrases" aria-label="Quick phrases"><button type="button" data-phrase="Ready!">Ready!</button><button type="button" data-phrase="Wait!">Wait!</button><button type="button" data-phrase="GG">GG</button></div>
+        <div class="party-chat-phrases party-emotes" aria-label="Race emotes"><button type="button" data-party-action="🤲" aria-label="Dua wave">🤲</button><button type="button" data-party-action="😱" aria-label="Surprised">😱</button><button type="button" data-party-action="☕" aria-label="Coffee break">☕</button><button type="button" data-party-action="⚡" aria-label="Lightning">⚡</button></div>
+        <button class="party-dua-boost" type="button" data-party-action="dua_wave">Dua Wave / Audhu Billahi Boost</button>
         <form class="party-chat-form" data-chat-form><input data-chat-input maxlength="140" aria-label="Message" placeholder="Write a message…" autocomplete="off"><button class="btn" type="submit">Send</button></form>
       </section>`;
     this.leaderboardLayer = document.createElement('div');
@@ -154,7 +166,18 @@ export class PartyRace {
         <div class="party-leaderboard-list" data-leaderboard-list></div>
         <div class="party-actions"><button class="btn secondary" type="button" data-leaderboard-close>Back</button></div>
       </section>`;
-    this.root.append(this.rootEl, this.board, this.remoteEdgeList, this.chatWidget, this.leaderboardLayer);
+    this.root.append(this.rootEl, this.board, this.remoteEdgeList, this.remoteNameplates, this.chatWidget, this.leaderboardLayer);
+    this.partyEventToast = document.createElement('div');
+    this.partyEventToast.className = 'party-event-toast';
+    this.partyEventToast.setAttribute('aria-live', 'polite');
+    this.root.append(this.partyEventToast);
+    this.raceProgress = document.createElement('div');
+    this.raceProgress.className = 'party-race-progress hidden';
+    this.raceProgress.setAttribute('aria-label', 'Race progress from Dars Library to Grand Academy Gate');
+    this.raceProgress.innerHTML = '<span class="party-race-endpoint party-race-start">Dars Library</span><div class="party-race-track" data-race-track><i class="party-race-shaytan" data-race-shaytan aria-label="Shaytan chasing">👹</i></div><span class="party-race-endpoint party-race-finish">Grand Academy Gate</span>';
+    this.root.append(this.raceProgress);
+    this.raceTrack = this.raceProgress.querySelector('[data-race-track]');
+    this.shaytanMarker = this.raceProgress.querySelector('[data-race-shaytan]');
     this.chatToggle = this.chatWidget.querySelector('[data-chat-toggle]');
     this.chatBadge = this.chatWidget.querySelector('[data-chat-badge]');
     this.chatPanel = this.chatWidget.querySelector('[data-chat-panel]');
@@ -169,6 +192,7 @@ export class PartyRace {
     this.codeInput = this.rootEl.querySelector('[data-code]');
     this.statusEl = this.rootEl.querySelector('[data-status]');
     this.roomCodeEl = this.rootEl.querySelector('[data-room-code]');
+    this.shareStatusEl = this.rootEl.querySelector('[data-share-status]');
     this.rosterEl = this.rootEl.querySelector('[data-roster]');
     this.waitRosterEl = this.rootEl.querySelector('[data-wait-roster]');
     this.spectatorTrackEl = this.rootEl.querySelector('[data-spectator-track]');
@@ -217,6 +241,7 @@ export class PartyRace {
     this.chatToggle.addEventListener('click', () => this._setChatOpen(!this.chatOpen));
     this.chatWidget.querySelector('[data-chat-close]').addEventListener('click', () => this._setChatOpen(false));
     this.chatWidget.querySelectorAll('[data-phrase]').forEach((button) => button.addEventListener('click', () => this._sendChat(button.dataset.phrase)));
+    this.chatWidget.querySelectorAll('[data-party-action]').forEach((button) => button.addEventListener('click', () => this._broadcastPartyEvent(button.dataset.partyAction)));
     this.chatWidget.querySelector('[data-chat-form]').addEventListener('submit', (event) => {
       event.preventDefault();
       this._sendChat(this.chatInput.value);
@@ -224,6 +249,12 @@ export class PartyRace {
     this.rootEl.querySelector('[data-create]').addEventListener('click', () => this._createRoom());
     this.rootEl.querySelector('[data-join]').addEventListener('click', () => this._joinRoom());
     this.rootEl.querySelector('[data-start]').addEventListener('click', () => this._send({ type: 'start' }));
+    this.roomCodeEl.addEventListener('click', () => this._copyRoomLink(true));
+    this.rootEl.querySelector('[data-copy-link]').addEventListener('click', () => this._copyRoomLink());
+    this.rootEl.querySelector('[data-share-whatsapp]').addEventListener('click', () => {
+      const url = roomShareUrl(this.roomCode);
+      window.open(`https://wa.me/?text=${encodeURIComponent(`Join my Malabar Runner race: ${url}`)}`, '_blank', 'noopener,noreferrer');
+    });
     this.rootEl.querySelector('[data-watch]').addEventListener('click', () => this._watchRace());
     this.rootEl.querySelector('[data-next]').addEventListener('click', () => this._send({ type: 'start' }));
     this.rootEl.querySelector('[data-play-again]').addEventListener('click', () => this._send({ type: 'play_again' }));
@@ -259,6 +290,12 @@ export class PartyRace {
     const result = await this._request({ type: 'health' }, { quiet: true, ignoreRoom: true });
     this.apiReady = Boolean(result?.ok);
     this._setStatus(this.apiReady ? 'Connected. Create a room or join with a code.' : 'Could not connect to the race server.', !this.apiReady);
+    const roomCode = new URLSearchParams(window.location.search).get('room')?.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    if (this.apiReady && (roomCode?.length === 4 || roomCode?.length === 6) && !this.room) {
+      this.codeInput.value = roomCode;
+      if (!this.nameInput.value.trim()) this.nameInput.value = 'Runner';
+      this._joinRoom();
+    }
   }
 
   async _request(message, { quiet = false, ignoreRoom = false } = {}) {
@@ -434,10 +471,12 @@ export class PartyRace {
   }
 
   _scheduleHeartbeat() {
-    if (document.hidden || this._timerMode !== 'idle' || !this.roomCode || this.heartbeatTimer) return;
+    const shouldHeartbeat = this._timerMode === 'idle' || (this._timerMode === 'running' && this.game.state === 'GAMEOVER');
+    if (document.hidden || !shouldHeartbeat || !this.roomCode || this.heartbeatTimer) return;
     this.heartbeatTimer = setTimeout(() => {
       this.heartbeatTimer = null;
-      if (document.hidden || this._timerMode !== 'idle' || !this.roomCode) return;
+      const stillNeeded = this._timerMode === 'idle' || (this._timerMode === 'running' && this.game.state === 'GAMEOVER');
+      if (document.hidden || !stillNeeded || !this.roomCode) return;
       this._send({ type: 'heartbeat' }, { quiet: true }).finally(() => this._scheduleHeartbeat());
     }, PARTY_HEARTBEAT_INTERVAL_MS);
   }
@@ -507,7 +546,7 @@ export class PartyRace {
     const name = this._name();
     if (!name) return;
     const code = this.codeInput.value.trim().toUpperCase();
-    if (code.length !== 6) return this._setStatus('Enter the 6-character room code.', true);
+    if (code.length !== 4 && code.length !== 6) return this._setStatus('Enter the 4-letter room code.', true);
     if (!this.apiReady) return this._setStatus('Still connecting to the race server…');
     this._send({ type: 'join', name, code, skinId: this.game.wardrobe?.selected || 'classic' });
   }
@@ -588,6 +627,10 @@ export class PartyRace {
 
   _updateRoom(room) {
     if (!room) return;
+    if (room.lastEvent?.id && room.lastEvent.id !== this.lastPartyEventId) {
+      this.lastPartyEventId = room.lastEvent.id;
+      this._showPartyEvent(room.lastEvent);
+    }
     this._syncRemoteLiveness(room);
     this.room = room;
     this.roomCode = room.code;
@@ -595,6 +638,7 @@ export class PartyRace {
     this._rememberRemoteSnapshots(room);
     this._syncNetworkTimers();
     this.roomCodeEl.textContent = room.code;
+    this._renderRaceProgress(room);
     this._renderBoard(room);
     if (room.phase === 'lobby') {
       this.board.classList.add('hidden');
@@ -631,6 +675,50 @@ export class PartyRace {
     if (room.phase === 'roundover' || room.phase === 'gameover') {
       this.board.classList.add('hidden');
       this._showResults(room);
+    }
+  }
+
+  _renderRaceProgress(room) {
+    const running = room.phase === 'running';
+    this.raceProgress.classList.toggle('hidden', !running);
+    this.root.classList.toggle('party-race-active', running);
+    if (!running) return;
+    const connected = room.players.filter((player) => player.connected);
+    const leaderDistance = Math.max(0, ...connected.map((player) => Number(player.distance) || 0));
+    const markers = connected.map((player, index) => {
+      const marker = document.createElement('span');
+      marker.className = `party-race-runner${player.id === this.playerId ? ' is-self' : ''}`;
+      marker.style.left = `${raceProgressPercent(player.distance, leaderDistance)}%`;
+      marker.style.setProperty('--runner-color', PLAYER_COLORS[index % PLAYER_COLORS.length]);
+      const runnerIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      runnerIcon.setAttribute('viewBox', '0 0 24 24');
+      runnerIcon.setAttribute('aria-hidden', 'true');
+      runnerIcon.innerHTML = '<circle cx="15.5" cy="4.5" r="2.5" fill="currentColor"/><path d="m12 8 4 2 2 4-2.2 1-1.3-2.7-2.4-1.2-2 3.2 3.3 2.2 1.8 5h-2.8l-1.5-3.4-4.5-3.2 3.3-5.6-2.7 2.3-2.6-.2.2-2.5 3.5-.2L12 8Zm-5 9-2.3 5H2l2.6-6.1 2.4 1.1Z" fill="currentColor"/>';
+      marker.append(runnerIcon);
+      marker.title = `${player.name}: ${numberText(player.distance)} m`;
+      marker.setAttribute('aria-label', marker.title);
+      return { marker, percent: raceProgressPercent(player.distance, leaderDistance) };
+    });
+    this.raceTrack.replaceChildren(this.shaytanMarker, ...markers.map(({ marker }) => marker));
+    const trailingProgress = markers.length ? Math.min(...markers.map(({ percent }) => percent)) : 0;
+    this.shaytanMarker.style.left = `${Math.max(0, trailingProgress - 9)}%`;
+  }
+
+  async _copyRoomLink(codeOnly = false) {
+    if (!this.roomCode) return;
+    const text = codeOnly ? this.roomCode : roomShareUrl(this.roomCode);
+    try {
+      await navigator.clipboard.writeText(text);
+      this.shareStatusEl.textContent = codeOnly ? 'Room code copied.' : 'Invite link copied.';
+    } catch {
+      const field = document.createElement('textarea');
+      field.value = text;
+      field.setAttribute('readonly', '');
+      field.style.position = 'fixed'; field.style.opacity = '0';
+      document.body.append(field); field.select();
+      const copied = document.execCommand('copy');
+      field.remove();
+      this.shareStatusEl.textContent = copied ? (codeOnly ? 'Room code copied.' : 'Invite link copied.') : 'Copy the code to share.';
     }
   }
 
@@ -858,6 +946,7 @@ export class PartyRace {
       }
       if (this.room.phase === 'gameover' || this.room.phase === 'roundover') this._showResults(this.room);
       else this._showEliminated();
+      this._scheduleHeartbeat();
       this._scheduleSpectatorPoll();
       return;
     }
@@ -892,6 +981,25 @@ export class PartyRace {
     }, { quiet: true }).finally(() => { this._progressPending = false; });
   }
 
+  _broadcastPartyEvent(action) {
+    if (!this.roomCode || this.room?.phase !== 'running') return;
+    this._send({ type: 'party_event', action }, { quiet: true });
+  }
+
+  _showPartyEvent(event) {
+    const labels = {
+      dua_wave: 'Dua wave!', boost: 'Power-up!',
+      '🤲': '🤲', '😱': '😱', '☕': '☕', '⚡': '⚡',
+    };
+    this.partyEventToast.textContent = `${event.name}: ${labels[event.action] || 'Race emote'}`;
+    this.partyEventToast.classList.remove('is-visible');
+    void this.partyEventToast.offsetWidth;
+    this.partyEventToast.classList.add('is-visible');
+    clearTimeout(this.partyEventTimer);
+    this.partyEventTimer = setTimeout(() => this.partyEventToast.classList.remove('is-visible'), 1300);
+    if (event.playerId !== this.playerId || event.action !== 'boost') this.game.audio?.play?.('powerup');
+  }
+
   _ensureRemoteAvatars(room) {
     if (!this.game.runnerRoot) return;
     const remotePlayers = room.players.filter((player) => player.id !== this.playerId && remoteRunnerIsAlive(player));
@@ -918,12 +1026,18 @@ export class PartyRace {
         object.receiveShadow = false;
       });
       avatar.setAnim('run');
+      avatar.nameplate = document.createElement('div');
+      avatar.nameplate.className = 'party-remote-nameplate';
+      avatar.nameplate.textContent = player.name;
+      avatar.nameplatePoint = new THREE.Vector3();
+      this.remoteNameplates.append(avatar.nameplate);
       this.remoteAvatars.set(player.id, avatar);
     }
   }
 
   _disposeRemote(avatar) {
     avatar.shieldBubble?.dispose?.();
+    avatar.nameplate?.remove?.();
     const group = avatar.group;
     if (group.parent) group.parent.remove(group);
     group.traverse((object) => {
@@ -1059,7 +1173,10 @@ export class PartyRace {
       const outsideRange = rawZ < -60 || rawZ > 6;
       this._setRemoteEdgeIndicator(player, remoteDistance - localDistance, outsideRange);
       avatar.group.visible = this.game.runnerRoot.visible && !outsideRange;
-      if (!avatar.group.visible) continue;
+      if (!avatar.group.visible) {
+        if (avatar.nameplate) avatar.nameplate.hidden = true;
+        continue;
+      }
       const blend = 1 - Math.exp(-dt * 10);
       avatar.group.position.x += (targetX - avatar.group.position.x) * blend;
       avatar.group.position.y += (targetY - avatar.group.position.y) * blend;
@@ -1070,6 +1187,21 @@ export class PartyRace {
       if (anim && avatar.anim !== anim) avatar.setAnim(anim);
       avatar.update(dt);
       avatar.shieldBubble?.update(dt);
+      const camera = this.game.camera;
+      if (!camera || !avatar.nameplate || !avatar.nameplatePoint) {
+        continue;
+      }
+      camera.updateMatrixWorld();
+      const projected = avatar.nameplatePoint
+        .set(avatar.group.position.x, avatar.group.position.y + 2.25, avatar.group.position.z)
+        .project(camera);
+      const screenX = (projected.x * 0.5 + 0.5) * window.innerWidth;
+      const screenY = (-projected.y * 0.5 + 0.5) * window.innerHeight;
+      avatar.nameplate.hidden = projected.z < -1 || projected.z > 1 ||
+        screenX < 0 || screenX > window.innerWidth || screenY < 0 || screenY > window.innerHeight;
+      avatar.nameplate.textContent = `${player.name} · ${numberText(remoteDistance)} m · Running`;
+      avatar.nameplate.style.left = `${screenX}px`;
+      avatar.nameplate.style.top = `${screenY}px`;
     }
     for (const [id, indicator] of this.remoteEdgeIndicators) {
       if (!peers.some((player) => player.id === id)) { indicator.remove(); this.remoteEdgeIndicators.delete(id); }
@@ -1123,6 +1255,7 @@ export class PartyRace {
     this.remoteDistanceMax.clear();
     this.remoteEdgeIndicators.clear();
     this.remoteEdgeList.replaceChildren();
+    this.remoteNameplates.replaceChildren();
     this.crashedRemoteIds.clear();
     this.spectating = false;
     this._remoteRoundKey = null;
@@ -1138,6 +1271,7 @@ export class PartyRace {
     clearInterval(this.countdownInterval);
     clearInterval(this.roundoverTimer);
     clearTimeout(this.chatTimer);
+    clearTimeout(this.partyEventTimer);
     this._clearNetworkTimers();
     document.removeEventListener('visibilitychange', this._onVisibilityChange);
     for (const avatar of this.remoteAvatars.values()) this._disposeRemote(avatar);
@@ -1145,6 +1279,8 @@ export class PartyRace {
     this.rootEl.remove();
     this.board.remove();
     this.remoteEdgeList.remove();
+    this.remoteNameplates.remove();
+    this.partyEventToast.remove();
     this.chatWidget.remove();
     this.leaderboardLayer.remove();
   }

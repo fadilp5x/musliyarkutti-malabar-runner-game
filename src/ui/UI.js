@@ -33,9 +33,10 @@ export class UI {
     this.subtitles.load();
 
     // Skip-intro hint (Oct 14, 2026): upper-right during cinematic.
-    this._skipHint = document.createElement('div');
-    this._skipHint.className = 'skip-intro-hint hidden';
-    this._skipHint.textContent = '⏭ PRESS ANY BUTTON TO SKIP INTRO';
+    this._skipHint = document.createElement('button');
+    this._skipHint.type = 'button';
+    this._skipHint.className = 'btn btn-ghost skip-intro-hint hidden';
+    this._skipHint.textContent = 'Skip story';
     this._skipHint.addEventListener('click', (e) => {
       e.stopPropagation();
       try { this.game.skipCinematic?.(); } catch {}

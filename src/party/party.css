@@ -71,6 +71,8 @@
 .party-board-stat { color: rgba(250, 247, 240, .75); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .party-board-state { grid-column: 1 / -1; color: rgba(250, 247, 240, .52); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
 .party-remote-edges { position: fixed; z-index: 22; top: max(78px, calc(env(safe-area-inset-top) + 70px)); left: 50%; display: grid; gap: 5px; transform: translateX(-50%); pointer-events: none; }
+.party-remote-nameplates { position: fixed; inset: 0; z-index: var(--z-hud); overflow: hidden; pointer-events: none; }
+.party-remote-nameplate { position: absolute; padding: 4px 8px; border: 2px solid var(--color-white); border-radius: var(--radius-pill); color: var(--color-ink); background: var(--color-white); box-shadow: var(--shadow-card); font: 700 0.75rem/1.2 var(--font-ui); white-space: nowrap; transform: translate(-50%, -100%); }
 .party-remote-edge { padding: 5px 9px; border: 1px solid rgba(255, 215, 0, .6); border-radius: 99px; background: rgba(10, 18, 39, .88); color: #fff3a6; font: 800 11px/1.2 system-ui, sans-serif; white-space: nowrap; }
 .party-crash-toast { position: fixed; z-index: 130; top: max(18px, env(safe-area-inset-top)); left: 50%; padding: 10px 15px; transform: translateX(-50%); border: 1px solid rgba(255, 215, 0, .62); border-radius: 13px; background: rgba(10, 18, 39, .94); color: #fff3a6; font: 800 13px/1.3 system-ui, sans-serif; box-shadow: 0 8px 25px rgba(0,0,0,.4); pointer-events: none; }
 .party-spectator-track { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; height: 190px; margin: 14px 0; }
@@ -173,6 +175,14 @@
 .party-chat-phrases button { min-height: 48px; border: 2px solid var(--color-green-700); border-radius: var(--radius-pill); color: var(--color-ink); background: var(--color-cloud); font: 600 0.9rem/1.2 var(--font-ui); }
 .party-chat-form input { min-height: 48px; border: 2px solid var(--color-ink); border-radius: var(--radius-md); color: var(--color-ink); background: var(--color-cloud); font: 1rem/1.2 var(--font-ui); }
 .party-trigger { color: var(--color-ink); background: var(--color-sky-400); box-shadow: var(--shadow-secondary); }
+.party-emotes { display: flex; gap: 8px; }
+.party-emotes button { min-width: 48px; font-size: 1.2rem; }
+.party-dua-boost { width: 100%; min-height: 48px; margin-top: 8px; border: 3px solid var(--color-ink); border-radius: var(--radius-pill); color: var(--color-ink); background: var(--color-sky-400); font: 700 0.9rem/1.2 var(--font-ui); cursor: pointer; }
+.party-dua-boost:active { transform: translateY(3px); }
+.party-event-toast { position: fixed; z-index: var(--z-toast); top: 24%; left: 50%; max-width: min(90vw, 420px); padding: 12px 18px; border: 3px solid var(--color-ink); border-radius: var(--radius-pill); color: var(--color-ink); background: var(--color-white); box-shadow: var(--shadow-toast); font: 700 1rem/1.2 var(--font-ui); text-align: center; opacity: 0; transform: translate(-50%, 8px); pointer-events: none; }
+.party-event-toast.is-visible { animation: party-event-in 1.3s var(--ease-bouncy) both; }
+@keyframes party-event-in { 0% { opacity: 0; transform: translate(-50%, 8px); box-shadow: var(--shadow-toast); } 12% { opacity: 1; transform: translate(-50%, 0); box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-sky-400) 18%, transparent), var(--shadow-toast); } 76% { opacity: 1; box-shadow: 0 0 0 60vmax color-mix(in srgb, var(--color-sky-400) 10%, transparent), var(--shadow-toast); } 100% { opacity: 0; transform: translate(-50%, -8px); box-shadow: 0 0 0 65vmax transparent, var(--shadow-toast); } }
+@media (prefers-reduced-motion: reduce) { .party-event-toast.is-visible { animation: none; opacity: 1; transform: translateX(-50%); } }
 
 @media (max-width: 560px) {
   .party-actions { flex-direction: column; }
@@ -372,3 +382,32 @@
   .party-actions { flex-direction: column; }
   .party-board { width: min(190px, 44vw); }
 }
+
+/* Heritage multiplayer accents and mobile room sharing. */
+.party-layer { background: color-mix(in srgb, var(--color-ink) 48%, transparent); }
+.party-card { background: var(--color-cloud); border-color: var(--color-gold-600); color: var(--color-ink); box-shadow: 0 7px 0 var(--color-ink), var(--shadow-card); }
+.party-title { color: var(--color-green-700); }
+.party-kicker { color: var(--color-gold-600); }
+.party-copy, .party-field, .party-status { color: var(--color-ink); }
+.party-code { min-height: 56px; align-items: center; justify-content: center; padding: 8px 20px; color: var(--color-ink); background: var(--color-gold-400); border: 3px dashed var(--color-gold-600); font: 700 clamp(1.4rem, 6vw, 2rem)/1 var(--font-ui); letter-spacing: .22em; cursor: pointer; }
+.party-share-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 0; }
+.party-share-button { min-height: 48px; border: 2px solid var(--color-green-700); border-radius: var(--radius-pill); color: var(--color-ink); background: var(--color-cloud); box-shadow: 0 3px 0 var(--color-green-700); font: 700 .95rem/1.1 var(--font-ui); cursor: pointer; }
+.party-share-status { min-height: 1.2em; margin-top: 4px; color: var(--color-green-700); font: 600 .85rem/1.2 var(--font-ui); }
+.party-race-progress { position: fixed; z-index: 19; top: max(5px, env(safe-area-inset-top)); left: 50%; display: grid; grid-template-columns: auto minmax(70px, 1fr) auto; align-items: center; gap: 7px; width: min(760px, calc(100vw - 20px)); min-height: 48px; padding: 5px 9px; border: 2px solid var(--color-gold-600); border-radius: var(--radius-pill); color: var(--color-cloud); background: color-mix(in srgb, var(--color-ink) 94%, transparent); box-shadow: var(--shadow-card); transform: translateX(-50%); font: 600 clamp(.55rem, 2.1vw, .78rem)/1.1 var(--font-ui); pointer-events: none; }
+.party-race-endpoint { max-width: 86px; color: var(--color-cloud); text-align: center; }
+.party-race-track { position: relative; height: 5px; border: 1px solid var(--color-gold-400); border-radius: var(--radius-pill); background: color-mix(in srgb, var(--color-cloud) 34%, var(--color-green-700)); }
+.party-race-track::before, .party-race-track::after { position: absolute; top: 50%; color: var(--color-gold-400); transform: translate(-50%, -50%); font-size: 14px; }
+.party-race-track::before { content: '⌂'; left: 0; }.party-race-track::after { content: '✦'; left: 100%; }
+.party-race-runner { position: absolute; top: 50%; display: grid; width: 24px; height: 24px; place-items: center; border: 2px solid var(--color-cloud); border-radius: 50%; color: var(--color-ink); background: var(--runner-color); box-shadow: 0 0 0 2px var(--color-ink); transform: translate(-50%, -50%); transition: left 400ms linear; font-weight: 800; }
+.party-race-runner.is-self { border-color: var(--color-gold-400); z-index: 2; }
+.party-race-shaytan { position: absolute; top: 50%; left: 0; z-index: 1; color: var(--color-coral-500); transform: translate(-50%, -50%); transition: left 400ms linear; font-style: normal; font-size: 16px; filter: drop-shadow(0 0 3px var(--color-coral-500)); }
+.party-race-active .party-board { top: max(74px, calc(env(safe-area-inset-top) + 68px)); }
+.party-layer button:focus-visible { outline: 3px solid var(--color-gold-400); outline-offset: 2px; }
+.party-layer button:not(.secondary):not([data-leave]) { color: var(--color-cloud); background: var(--color-green-500); }
+.party-layer .party-actions button.secondary, .party-layer [data-close], .party-layer [data-leaderboard-close] { color: var(--color-ink); background: var(--color-cloud); }
+.party-spectator-dot { color: var(--color-cloud); background: var(--color-green-500); }
+.party-layer button.party-code { color: var(--color-ink); background: var(--color-gold-400); }
+.party-layer button.party-share-button { color: var(--color-ink); background: var(--color-cloud); }
+.party-race-runner svg { width: 15px; height: 15px; color: var(--color-cloud); }
+@media (max-width: 430px) { .party-race-progress { grid-template-columns: 54px minmax(0, 1fr) 75px; gap: 4px; padding-inline: 5px; } .party-race-endpoint { font-size: .55rem; } .party-race-runner { width: 22px; height: 22px; } }
+@media (prefers-reduced-motion: reduce) { .party-race-runner, .party-race-shaytan { transition: none; } }

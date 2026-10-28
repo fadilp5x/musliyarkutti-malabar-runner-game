@@ -6,6 +6,9 @@
 import * as THREE from 'three';
 import { aabbOverlap, rowIsFair, LANES } from './CollisionSystem.js';
 
+// Reused AABB storage: one active collision loop runs at a time in this game.
+const _obstacleBox = { x0: 0, x1: 0, y0: 0, y1: 0, z0: 0, z1: 0 };
+
 // type -> { plane:[w,h], y (plane centre), flat, kind, box, svg, glow }
 const TYPES = {
   low_barrier: {
@@ -125,6 +128,7 @@ export class ObstacleManager {
     this.currentDistanceM = 0;
     /** live obstacles: { type, lane, z, group, box, kind, passed, hit, w, h, drift } */
     this.obstacles = [];
+    this._debugBoxes = [];
 
     this._textures = null;
     this._texInitStarted = false;
@@ -247,6 +251,7 @@ export class ObstacleManager {
       const tex = this._tex(def.svg) || fallbackTexture(def.kind);
       const mat = new THREE.MeshLambertMaterial({
         map: tex, transparent: true, alphaTest: 0.1, side: THREE.DoubleSide,
+        ...(def.flat ? { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, depthWrite: false } : {}),
       });
       if (def.dark) { mat.opacity = 0.85; mat.transparent = true; mat.alphaTest = 0; }
       const mesh = new THREE.Mesh(planeGeo(def.plane[0], def.plane[1]), mat);
@@ -272,6 +277,7 @@ export class ObstacleManager {
     this.scene.add(group);
     const ob = {
       type, lane, z, group,
+      prevZ: z,
       box: def.box, kind: def.kind,
       passed: false, hit: false,
       w: def.plane[0], h: def.plane[1],
@@ -357,19 +363,24 @@ export class ObstacleManager {
 
   /** Live obstacle AABBs for the dev collision overlay (CollisionDebug). */
   debugBoxes() {
-    return this.obstacles.map((ob) => {
+    while (this._debugBoxes.length < this.obstacles.length) this._debugBoxes.push({});
+    this._debugBoxes.length = this.obstacles.length;
+    for (let i = 0; i < this.obstacles.length; i += 1) {
+      const ob = this.obstacles[i];
       const b = ob.box;
       const y0 = b.yBase || 0;
-      return {
-        type: ob.type, kind: ob.kind, lane: ob.lane,
-        x0: LANES[ob.lane] - b.w / 2,
-        x1: LANES[ob.lane] + b.w / 2,
-        y0,
-        y1: y0 + b.h,
-        z0: ob.z - b.d / 2,
-        z1: ob.z + b.d / 2,
-      };
-    });
+      const out = this._debugBoxes[i];
+      out.type = ob.type;
+      out.kind = ob.kind;
+      out.lane = ob.lane;
+      out.x0 = LANES[ob.lane] - b.w / 2;
+      out.x1 = LANES[ob.lane] + b.w / 2;
+      out.y0 = y0;
+      out.y1 = y0 + b.h;
+      out.z0 = ob.z - b.d / 2;
+      out.z1 = ob.z + b.d / 2;
+    }
+    return this._debugBoxes;
   }
 
   /** Lane indexes 0..2 with no 'block'-kind obstacle in the spawn window. */
@@ -471,6 +482,7 @@ export class ObstacleManager {
 
     for (let i = this.obstacles.length - 1; i >= 0; i--) {
       const ob = this.obstacles[i];
+      ob.prevZ = ob.z;
       ob.z += speed * ob.drift * dt;
       ob.group.position.z = ob.z;
 
@@ -488,45 +500,41 @@ export class ObstacleManager {
         continue;
       }
 
-      // near-miss: passed the player in an adjacent lane without incident
-      if (!ob.passed && ob.z > 1.5) {
-        ob.passed = true;
-        if (
-          (ob.kind === 'jump' || ob.kind === 'block' || ob.kind === 'slide') &&
-          !ob.hit && pl !== undefined && pl !== null &&
-          Math.abs(pl - ob.lane) === 1
-        ) {
-          this.events.emit('nearmiss');
-        }
-        continue;
-      }
-
       // collision
       if (playerBox && !ob.passed) {
         const b = ob.box;
         const y0 = b.yBase || 0;
-        const obBox = {
-          x0: LANES[ob.lane] - b.w / 2,
-          x1: LANES[ob.lane] + b.w / 2,
-          y0,
-          y1: y0 + b.h,
-          z0: ob.z - b.d / 2,
-          z1: ob.z + b.d / 2,
-        };
-        if (!aabbOverlap(playerBox, obBox)) continue;
+        _obstacleBox.x0 = LANES[ob.lane] - b.w / 2;
+        _obstacleBox.x1 = LANES[ob.lane] + b.w / 2;
+        _obstacleBox.y0 = y0;
+        _obstacleBox.y1 = y0 + b.h;
+        // Treadmill coordinates keep the player at z=0 and move obstacles
+        // toward them. Sweeping the obstacle's previous/current bounds is
+        // equivalent to sweeping the player and also covers delayed frames.
+        _obstacleBox.z0 = Math.min(ob.prevZ, ob.z) - b.d / 2;
+        _obstacleBox.z1 = Math.max(ob.prevZ, ob.z) + b.d / 2;
+        if (!aabbOverlap(playerBox, _obstacleBox)) {
+          if (!ob.passed && ob.z > 1.5) {
+            ob.passed = true;
+            if ((ob.kind === 'jump' || ob.kind === 'block' || ob.kind === 'slide') &&
+                !ob.hit && pl !== undefined && pl !== null && Math.abs(pl - ob.lane) === 1) {
+              this.events.emit('nearmiss');
+            }
+          }
+          continue;
+        }
 
         switch (ob.kind) {
           case 'jump':
             if (jet) break; // flying clean over it
-            if (playerBox.y0 < 0.55 && !ob.hit) {
+            if (playerBox.y0 <= 1.1 && !ob.hit) {
               ob.hit = true;
               this.events.emit('crash', { type: ob.type, kind: ob.kind, index: i });
             }
             break;
           case 'slide':
-            // gate: crash when the player's body is too tall (standing/jumping
-            // into it). A proper slide (height <= 1.1) never overlaps the bar.
-            if (playerBox.y1 - playerBox.y0 > 1.1 && !ob.hit) {
+            // A true slide clears the overhead bar regardless of jump height.
+            if (!mods.sliding && playerBox.y1 - playerBox.y0 > 1.1 && !ob.hit) {
               ob.hit = true;
               this.events.emit('crash', { type: ob.type, kind: ob.kind, index: i });
             }
@@ -556,6 +564,15 @@ export class ObstacleManager {
             this._portalCd = 0.5;
             this.events.emit('crash', { type: ob.type, kind: 'portal', lane: ob.lane, index: i });
             break;
+        }
+      }
+
+      // near-miss: passed the player in an adjacent lane without incident
+      if (!ob.passed && ob.z > 1.5) {
+        ob.passed = true;
+        if ((ob.kind === 'jump' || ob.kind === 'block' || ob.kind === 'slide') &&
+            !ob.hit && pl !== undefined && pl !== null && Math.abs(pl - ob.lane) === 1) {
+          this.events.emit('nearmiss');
         }
       }
     }

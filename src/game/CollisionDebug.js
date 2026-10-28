@@ -15,6 +15,7 @@ const KIND_COLORS = {
   jump: 0xffff00,
   slide: 0x00ccff,
 };
+const DEBUG_OBSTACLE_CAPACITY = 32;
 
 export class CollisionDebug {
   constructor(root, events) {
@@ -23,7 +24,15 @@ export class CollisionDebug {
     this.group.name = 'collision-debug';
     this.root.add(this.group);
     this._obHelpers = [];
-    this._playerHelper = null;
+    this._playerBox = new THREE.Box3();
+    this._playerHelper = new THREE.Box3Helper(this._playerBox, 0x00ff88);
+    this.group.add(this._playerHelper);
+    this._obBoxes = Array.from({ length: DEBUG_OBSTACLE_CAPACITY }, () => new THREE.Box3());
+    this._obHelpers = this._obBoxes.map((box) => new THREE.Box3Helper(box, 0xffffff));
+    for (const helper of this._obHelpers) {
+      helper.visible = false;
+      this.group.add(helper);
+    }
     this._laneLines = [];
     this._drawLaneGuides();
     this._logEvents(events);
@@ -49,11 +58,10 @@ export class CollisionDebug {
     }
   }
 
-  _box3(b) {
-    return new THREE.Box3(
-      new THREE.Vector3(b.x0, b.y0, b.z0),
-      new THREE.Vector3(b.x1, b.y1, b.z1)
-    );
+  _writeBox(box, b) {
+    box.min.set(b.x0, b.y0, b.z0);
+    box.max.set(b.x1, b.y1, b.z1);
+    return box;
   }
 
   _disposeHelper(h) {
@@ -68,26 +76,30 @@ export class CollisionDebug {
    * @param {Array} obstacleBoxes AABBs from ObstacleManager.debugBoxes()
    */
   update(playerBox, obstacleBoxes) {
-    for (const h of this._obHelpers) this._disposeHelper(h);
-    this._obHelpers = [];
-    this._disposeHelper(this._playerHelper);
-    this._playerHelper = null;
-
     if (playerBox) {
-      this._playerHelper = new THREE.Box3Helper(this._box3(playerBox), 0x00ff88);
-      this.group.add(this._playerHelper);
+      this._writeBox(this._playerBox, playerBox);
+      this._playerHelper.visible = true;
+      this._playerHelper.updateMatrixWorld(true);
+    } else {
+      this._playerHelper.visible = false;
     }
-    for (const b of obstacleBoxes || []) {
+    const boxes = obstacleBoxes || [];
+    for (let i = 0; i < Math.min(boxes.length, DEBUG_OBSTACLE_CAPACITY); i += 1) {
+      const b = boxes[i];
       const color = KIND_COLORS[b.kind] !== undefined ? KIND_COLORS[b.kind] : 0xffffff;
-      const helper = new THREE.Box3Helper(this._box3(b), color);
-      this.group.add(helper);
-      this._obHelpers.push(helper);
+      this._writeBox(this._obBoxes[i], b);
+      const helper = this._obHelpers[i];
+      helper.material.color.setHex(color);
+      helper.visible = true;
+      helper.updateMatrixWorld(true);
     }
+    for (let i = Math.min(boxes.length, DEBUG_OBSTACLE_CAPACITY); i < this._obHelpers.length; i += 1) this._obHelpers[i].visible = false;
   }
 
   dispose() {
     for (const h of this._obHelpers) this._disposeHelper(h);
     this._obHelpers = [];
+    this._obBoxes = [];
     this._disposeHelper(this._playerHelper);
     this._playerHelper = null;
     for (const l of this._laneLines) this._disposeHelper(l);

@@ -54,6 +54,7 @@ export class PlayerController {
     this.avatar.reset();
     this.avatar.runRate = 1;
     this.avatar.runPhase = 0;
+    this._box = this._box || { x0: 0, x1: 0, y0: 0, y1: 0, z0: -0.3, z1: 0.3 };
   }
 
   _locomotion() {
@@ -186,14 +187,11 @@ export class PlayerController {
 
   getBox() {
     const y0 = this.y + this.flyY;
-    return {
-      x0: this.x - 0.35,
-      x1: this.x + 0.35,
-      y0,
-      y1: y0 + (this.sliding ? 0.85 : 1.7),
-      z0: -0.3,
-      z1: 0.3,
-    };
+    this._box.x0 = this.x - 0.35;
+    this._box.x1 = this.x + 0.35;
+    this._box.y0 = y0;
+    this._box.y1 = y0 + (this.sliding ? 0.85 : 1.7);
+    return this._box;
   }
 }
 

@@ -4,9 +4,8 @@ import { AVATAR_SKIN_IDS, DEFAULT_SKIN_ID } from '../src/game/AvatarSkins.js';
 export const MAX_PLAYERS = 8;
 export const MAX_ROUNDS = 3;
 const ROOM_TTL_MS = 3 * 60 * 60 * 1000;
-// Leave room for backgrounded tabs to resume and send an immediate heartbeat.
-const PLAYER_TIMEOUT_MS = 60_000;
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const PLAYER_TIMEOUT_MS = 10_000;
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const ROOM_PREFIX = 'rooms/';
 const CHAT_PREFIX = 'chat/';
 const CHAT_MAX_MESSAGES = 50;
@@ -39,10 +38,12 @@ const REQUEST_FIELDS = {
   leave: ['type', 'playerId', 'code'],
   progress: ['type', 'playerId', 'code', 'distance', 'score', 'coins', 'lane', 'y', 'anim', 'speed', 'runClock', 'shield'],
   finish: ['type', 'playerId', 'code', 'distance', 'score', 'coins'],
+  party_event: ['type', 'playerId', 'code', 'action'],
   chat_send: ['type', 'playerId', 'code', 'text'],
   chat_poll: ['type', 'playerId', 'code', 'afterId'],
   leaderboard_get: ['type', 'playerId'],
 };
+const PARTY_EVENT_ACTIONS = new Set(['dua_wave', 'boost', '🤲', '😱', '☕', '⚡']);
 
 const json = (body, status = 200) => new Response(JSON.stringify({ ...body, serverNow: Date.now() }), {
   status,
@@ -64,7 +65,7 @@ function cleanCode(value) {
 }
 
 function newRoomCode() {
-  return Array.from({ length: 6 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join('');
+  return Array.from({ length: 4 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join('');
 }
 
 const roomKey = (code) => `${ROOM_PREFIX}${code}`;
@@ -97,6 +98,7 @@ function snapshot(room, now) {
     round: room.round,
     maxRounds: MAX_ROUNDS,
     roundResults: room.roundResults,
+    lastEvent: room.lastEvent || null,
     players: room.players.map((player) => ({
       id: player.id,
       name: player.name,
@@ -217,6 +219,7 @@ function beginRound(room, now) {
     player.alive = true;
   }
   room.seed = randomBytes(4).readUInt32BE(0);
+  room.lastEvent = null;
   room.phase = 'countdown';
   room.startAt = now + 3000;
   room.autoStartAt = null;
@@ -239,6 +242,7 @@ async function createRoom(store, playerId, name, skinId, now) {
       seed: randomBytes(4).readUInt32BE(0),
       startAt: null,
       autoStartAt: null,
+      lastEvent: null,
       expiresAt: now + ROOM_TTL_MS,
     };
     const result = await store.setJSON(roomKey(code), room, { onlyIfNew: true });
@@ -427,6 +431,15 @@ function handleAction(room, playerId, body, now) {
   if (restoreHost) room.hostId = playerId;
 
   if (body.type === 'heartbeat') return { changed: true };
+  if (body.type === 'party_event') {
+    if (room.phase !== 'running') return publicError('Race emotes are only available during a run.');
+    if (!player.alive) return publicError('Finished runners cannot send race emotes.');
+    if (!PARTY_EVENT_ACTIONS.has(body.action)) return publicError('Unknown race emote.');
+    if (now - (player.lastPartyEventAt || 0) < 700) return publicError('Please wait before sending another race emote.', 429);
+    player.lastPartyEventAt = now;
+    room.lastEvent = { id: randomUUID(), action: body.action, playerId, name: player.name, timestamp: now };
+    return { changed: true };
+  }
   if (body.type === 'leave') {
     player.connected = false;
     player.alive = false;
@@ -525,7 +538,7 @@ export async function handleGameRequest(request, { store, leaderboardStore = sto
     }
     if (body.type === 'create') return createRoom(store, playerId, body.name, skinId, now);
     const code = cleanCode(body.code);
-    if (code.length !== 6) return json({ error: 'Enter the 6-character room code.' }, 400);
+    if (code.length !== 4 && code.length !== 6) return json({ error: 'Enter the 4-letter room code.' }, 400);
     if (body.type === 'join') return joinRoom(store, code, playerId, body.name, skinId, now);
     if (body.type === 'chat_send' || body.type === 'chat_poll') {
       const roomUpdate = await mutateRoom(store, code, playerId, now, () => ({ changed: false }), leaderboardStore);

@@ -8,11 +8,11 @@ describe('shared UI design system', () => {
   it('defines the requested palette, scales, shared classes, and motion preferences', () => {
     const css = read('src/ui/tokens.css');
     for (const token of [
-      '--color-green-500: #22B35A', '--color-green-700: #14803D',
-      '--color-gold-400: #FFC42E', '--color-gold-600: #D99A00',
-      '--color-sky-400: #3FA9F5', '--color-sky-600: #1C7CC9',
+      '--color-green-500: #0D6E52', '--color-green-700: #084A39',
+      '--color-gold-400: #E5A93C', '--color-gold-600: #A76F13',
+      '--color-sky-400: #FDF8EE', '--color-sky-600: #1E140C',
       '--color-coral-500: #FF5D4A', '--color-coral-700: #C93A2B',
-      '--color-cloud: #F4FAF6', '--color-ink: #10301F', '--color-white: #FFFFFF',
+      '--color-cloud: #FDF8EE', '--color-ink: #1E140C', '--color-white: #FDF8EE',
       '--space-1: 4px', '--space-2: 8px', '--space-3: 12px',
       '--space-4: 16px', '--space-6: 24px', '--space-8: 32px',
       '--radius-md: 12px', '--radius-lg: 16px', '--radius-pill: 999px',

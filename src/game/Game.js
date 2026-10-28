@@ -35,6 +35,7 @@ import { SpawnDebugOverlay } from './SpawnDebugOverlay.js';
 import { ShieldBubble } from './ShieldBubble.js';
 import { NearMissCombo, effectiveScoreMultiplier } from './NearMissCombo.js';
 import { MilestoneTracker } from './MilestoneTracker.js';
+import { shouldPlayIntro } from './introFlow.js';
 
 // Fixed-timestep simulation: 120 Hz steps, max 5 steps per frame, render each rAF.
 const STEP = 1 / 120;
@@ -184,7 +185,7 @@ export class Game {
     // matches this so the dome melts into the fogged ground.
     this.scene.fog = new THREE.Fog(0x87b5d6, 40, 160);
 
-    this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 180);
     this.camera.position.set(0, 2.4, 5.4);
     this.cameraCtl = new CameraController(this.camera);
 
@@ -325,8 +326,9 @@ export class Game {
     // Dev-only collision overlay: ?debug=collisions (dynamic import so it
     // never joins the production bundle).
     try {
-      if (typeof window !== 'undefined' &&
-          new URLSearchParams(window.location.search).get('debug') === 'collisions') {
+      const collisionDebugQuery = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('debug') : null;
+      if (collisionDebugQuery === 'collisions' || collisionDebugQuery === 'true') {
         const { CollisionDebug } = await import('./CollisionDebug.js');
         this.collisionDebug = new CollisionDebug(this.runnerRoot, this.events);
         console.log('[game] collision debug overlay enabled (?debug=collisions)');
@@ -500,15 +502,26 @@ export class Game {
     }
   }
 
-  startRun() {
-    // First-time players choose tutorial preference before the cinematic.
+  startRun({ story = 'auto' } = {}) {
+    if (this.state !== STATES.LIBRARY) return false;
+    const startStory = story === 'force' ? 'force' : 'auto';
+    // PLAY keeps the first-run choice ahead of its automatic intro. Story
+    // force starts its cinematic immediately, then asks before the runner.
     const data = this.save.load();
-    if (!data.tutorialPreference) {
+    if (!data.tutorialPreference && startStory === 'auto') {
       this.ui.showTutorialChoice();
       this._pendingStartRun = true;
-      return;
+      this._pendingStartStory = startStory;
+      return true;
     }
-    this._startShaytan();
+    if (!data.tutorialPreference && startStory === 'force') this._tutorialChoiceAfterIntro = true;
+    this._continueSoloStart(startStory, data);
+    return true;
+  }
+
+  _continueSoloStart(story, data = this.save.load()) {
+    if (shouldPlayIntro(story, data.hasSeenIntro === true)) this._startShaytan();
+    else this._beginRunner();
   }
 
   // All players enter the same runner scene on the room's shared countdown.
@@ -562,7 +575,14 @@ export class Game {
   proceedAfterTutorialChoice() {
     if (this._pendingStartRun) {
       this._pendingStartRun = false;
-      this._startShaytan();
+      if (this._continueRunnerAfterChoice) {
+        this._continueRunnerAfterChoice = false;
+        this._beginRunner();
+        return;
+      }
+      const story = this._pendingStartStory || 'auto';
+      this._pendingStartStory = null;
+      this._continueSoloStart(story);
     }
   }
 
@@ -896,8 +916,7 @@ export class Game {
       return;
     }
     if (this.state === STATES.LIBRARY) {
-      // Any tap/click/key starts the scare
-      this._startShaytan();
+      // Only explicit title actions start a run or the story.
       return;
     }
     if (this.state !== STATES.RUNNER && this.state !== STATES.TUTORIAL) return;
@@ -937,13 +956,6 @@ export class Game {
 
   async _startShaytan() {
     if (this.state !== STATES.LIBRARY) return;
-    // Check if we should skip (player has seen it before and chose to skip)
-    const data = this.save.load();
-    if (data.hasSeenIntro && this._skipIntroRequested) {
-      this._skipIntroRequested = false;
-      this._beginRunner();
-      return;
-    }
     // Cinematic opening (Oct 14, 2026): narration-synced 8-state sequence.
     // Any key/click/tap during the cinematic skips to gameplay.
     this.setState(STATES.LIBRARY_INTRO);
@@ -966,13 +978,26 @@ export class Game {
     }
     // If skipped, _beginRunner was already called by skipCinematic().
     if (this._cinematicSignal.aborted) return;
-    // Mark intro as seen
+    this._finishIntro();
+  }
+
+  _finishIntro() {
+    this.ui?._setSkipHint?.(false);
+    let data = null;
     try {
-      const d = this.save.load();
-      d.hasSeenIntro = true;
-      this.save.save(d);
-    } catch {}
-    // Cinematic done → start the runner
+      data = this.save.load();
+      data.hasSeenIntro = true;
+      this.save.save(data);
+    } catch { /* preserve the run even if saving fails */ }
+    if (this._tutorialChoiceAfterIntro && !data?.tutorialPreference) {
+      this._tutorialChoiceAfterIntro = false;
+      this._pendingStartRun = true;
+      this._pendingStartStory = null;
+      this._continueRunnerAfterChoice = true;
+      this.ui.showTutorialChoice();
+      return;
+    }
+    this._tutorialChoiceAfterIntro = false;
     this._beginRunner();
   }
 
@@ -988,13 +1013,7 @@ export class Game {
     // Stop intro audio/subtitles immediately
     try { this.audio?.stopNarration?.(); } catch {}
     try { this.ui?.subtitles?.stop?.(); } catch {}
-    // Mark as seen (player chose to skip)
-    try {
-      const d = this.save.load();
-      d.hasSeenIntro = true;
-      this.save.save(d);
-    } catch {}
-    this._beginRunner();
+    this._finishIntro();
   }
 
   // Arm the "any input skips" listener for the cinematic duration.
@@ -1023,10 +1042,9 @@ export class Game {
     }
   }
 
-  // Called by the Skip Intro button (only shown after first viewing)
+  // Legacy compatibility hook for the automatic story/run route.
   skipIntro() {
-    this._skipIntroRequested = true;
-    this._startShaytan();
+    this.startRun({ story: 'auto' });
   }
 
   async _startChase() {
@@ -1273,7 +1291,7 @@ export class Game {
 
     // dev collision overlay
     if (this.collisionDebug) {
-      this.collisionDebug.update(this.player.getBox(), this.obstacles.debugBoxes());
+      this.collisionDebug.update(box, this.obstacles.debugBoxes());
     }
 
     this.collectibles.spawnPatterns(this.scoring.distanceM);

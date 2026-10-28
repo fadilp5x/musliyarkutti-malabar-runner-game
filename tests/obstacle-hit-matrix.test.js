@@ -166,6 +166,29 @@ describe('obstacle hit matrix', () => {
     expect(simulate('low_barrier', 1, 'standing', 28, 1000)).toBe('hit');
   });
 
+  it('sweeps a barrier through the player box when one simulation step crosses its full depth', () => {
+    const events = [];
+    const bus = { on() {}, emit(name, data) { events.push({ name, data }); } };
+    const manager = new ObstacleManager(new THREE.Scene(), bus, { textures: {} }, () => 0.5);
+    manager.spawnObstacle('low_barrier', 1, -3);
+    manager.update(0.2, 28, 0, stateBox(1, 'standing'), 1);
+    expect(events.some((event) => event.name === 'crash')).toBe(true);
+  });
+
+  it('uses the explicit low-barrier clearance height and sliding state', () => {
+    const run = (type, y, sliding) => {
+      const events = [];
+      const bus = { on() {}, emit(name) { events.push(name); } };
+      const manager = new ObstacleManager(new THREE.Scene(), bus, { textures: {} }, () => 0.5);
+      manager.spawnObstacle(type, 1, -0.5);
+      manager.update(1 / 120, 10, 0, { ...stateBox(1, 'standing'), y0: y, y1: y + 1.7 }, 1, { sliding });
+      return events.includes('crash');
+    };
+    expect(run('low_barrier', 0.8, false)).toBe(true);
+    expect(run('low_barrier', 1.2, false)).toBe(false);
+    expect(run('overhead_gate', 0, true)).toBe(false);
+  });
+
   it('cannot skip an overlapping box when the passed branch begins at z > 1.5', () => {
     // The largest obstacle depth is 1.2 m, so its near edge is at z > 0.9
     // once its center passes 1.5 m. The player's far edge is z=0.3 m.

@@ -68,6 +68,7 @@ describe('Netlify room service', () => {
     const created = await call({ type: 'create', playerId: playerA, name: 'Amina' });
     expect(created.status).toBe(201);
     const { code } = created.body;
+    expect(code).toMatch(/^[A-Z]{4}$/);
     const joined = await call({ type: 'join', playerId: playerB, name: 'Basheer', code });
     expect(joined.status).toBe(201);
 
@@ -110,6 +111,40 @@ describe('Netlify room service', () => {
     expect(store.reads.some((read) => read.consistency === 'strong')).toBe(true);
   });
 
+  it('serializes simultaneous joins with conditional Blob writes', async () => {
+    const store = new ConditionalBlobStore();
+    const now = 1_800_000_000_000;
+    const request = async (body) => handleGameRequest(new Request('https://game.test/.netlify/functions/game', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    }), { store, now });
+    const createdResponse = await request({ type: 'create', playerId: 'player-race-host-11111111', name: 'Host' });
+    const created = await createdResponse.json();
+    const joins = await Promise.all([
+      request({ type: 'join', playerId: 'player-race-guest-a-111111', code: created.code, name: 'A' }),
+      request({ type: 'join', playerId: 'player-race-guest-b-111111', code: created.code, name: 'B' }),
+    ]);
+    expect(joins.map((response) => response.status)).toEqual([201, 201]);
+    const stored = store.entries.get(`rooms/${created.code}`).data;
+    expect(stored.players.map((player) => player.name)).toEqual(['Host', 'A', 'B']);
+    expect(store.writes.filter((write) => write.onlyIfMatch).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('marks an inactive player disconnected after ten seconds', async () => {
+    const store = new ConditionalBlobStore();
+    const now = 1_800_000_000_000;
+    const playerId = 'player-timeout-host-11111111';
+    const createdResponse = await handleGameRequest(new Request('https://game.test/.netlify/functions/game', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'create', playerId, name: 'Host' }),
+    }), { store, now });
+    const created = await createdResponse.json();
+    const readResponse = await handleGameRequest(new Request(`https://game.test/.netlify/functions/game?${new URLSearchParams({ code: created.code, playerId })}`), {
+      store, now: now + 10_001,
+    });
+    const read = await readResponse.json();
+    expect(read.room.players[0].connected).toBe(false);
+  });
+
   it('automatically starts the next round when a room read passes autoStartAt', async () => {
     const fixture = await runningRoomFixture('player-auto-start-111111111111');
     const guestId = `${fixture.playerId}B`;
@@ -117,6 +152,9 @@ describe('Netlify room service', () => {
     const finished = await fixture.request({ type: 'finish', playerId: guestId, code: fixture.code, distance: 18, score: 18, coins: 0 }, fixture.runningAt);
     expect(finished.body.room.phase).toBe('roundover');
     expect(finished.body.room.autoStartAt).toBe(fixture.runningAt + 25_000);
+
+    await fixture.request({ type: 'heartbeat', playerId: fixture.playerId, code: fixture.code }, finished.body.room.autoStartAt - 1000);
+    await fixture.request({ type: 'heartbeat', playerId: guestId, code: fixture.code }, finished.body.room.autoStartAt - 1000);
 
     const read = await handleGameRequest(new Request(`https://game.test/.netlify/functions/game?${new URLSearchParams({ code: fixture.code, playerId: fixture.playerId })}`), {
       store: fixture.store,
@@ -224,12 +262,12 @@ describe('Netlify room service', () => {
       return { status: response.status, body: await response.json() };
     };
     const created = await request({ type: 'create', playerId: hostId, name: 'Host' }, baseTime);
-    const joined = await request({ type: 'join', playerId: guestId, code: created.body.code, name: 'Guest' }, baseTime + 30_000);
+    const joined = await request({ type: 'join', playerId: guestId, code: created.body.code, name: 'Guest' }, baseTime + 9_000);
     expect(joined.body.room.hostId).toBe(hostId);
     expect(joined.body.room.players.map((player) => [player.name, player.connected])).toEqual([
       ['Host', true], ['Guest', true],
     ]);
-    const started = await request({ type: 'start', playerId: hostId, code: created.body.code }, baseTime + 30_100);
+    const started = await request({ type: 'start', playerId: hostId, code: created.body.code }, baseTime + 9_100);
     expect(started.body.room.phase).toBe('countdown');
   });
 
@@ -252,6 +290,22 @@ describe('Netlify room service', () => {
     expect(resumed.body.room.players.every((player) => player.connected)).toBe(true);
     const started = await request({ type: 'start', playerId: hostId, code: created.body.code }, baseTime + 71_100);
     expect(started.body.room.phase).toBe('countdown');
+  });
+
+  it('broadcasts only allowed multiplayer emotes to room members', async () => {
+    const fixture = await runningRoomFixture('player-emote-host-111111111111');
+    const sent = await fixture.request({ type: 'party_event', playerId: fixture.playerId, code: fixture.code, action: 'dua_wave' }, fixture.runningAt + 1000);
+    expect(sent.status).toBe(200);
+    expect(sent.body.room.lastEvent).toMatchObject({
+      action: 'dua_wave', playerId: fixture.playerId, name: 'Runner', timestamp: fixture.runningAt + 1000,
+    });
+
+    const limited = await fixture.request({ type: 'party_event', playerId: fixture.playerId, code: fixture.code, action: '⚡' }, fixture.runningAt + 1500);
+    expect(limited.status).toBe(429);
+    const unknown = await fixture.request({ type: 'party_event', playerId: fixture.playerId, code: fixture.code, action: 'admin' }, fixture.runningAt + 2000);
+    expect(unknown.status).toBe(400);
+    const nonMember = await fixture.request({ type: 'party_event', action: '🤲', playerId: 'player-not-in-room-11111111', code: fixture.code }, fixture.runningAt + 2500);
+    expect(nonMember.status).toBe(404);
   });
 
   it('clamps forged coins to the distance-based physical limit', async () => {

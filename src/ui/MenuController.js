@@ -272,6 +272,19 @@ export class MenuController {
     bg.setAttribute('aria-hidden', 'true');
     el.appendChild(bg);
 
+    const storyButton = document.createElement('button');
+    storyButton.type = 'button';
+    storyButton.className = 'story-button';
+    storyButton.setAttribute('aria-label', 'Play the story');
+    storyButton.innerHTML = `<svg class="story-mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+      <circle class="runner-head" cx="39" cy="11" r="7" />
+      <path class="runner-body" d="M33 21 24 37l10 5 8-14 8 7 5-5-12-12z" />
+      <path class="runner-limb" d="m31 25-12-5-8 7m22 15-13 8-10 1m22-9 11 5 8 10" />
+      <path class="runner-limb" d="m42 22 10-8 7 2" />
+    </svg><span>STORY</span>`;
+    storyButton.addEventListener('click', this.click(() => this._playStoryTransition()));
+    el.appendChild(storyButton);
+
     const title = document.createElement('h1');
     title.className = 'game-title';
     title.innerHTML = 'MUSLIYARKUTTI<br><span class="accent">MALABAR RUNNER</span>';
@@ -288,8 +301,21 @@ export class MenuController {
     playButton.className = 'btn btn-primary title-play';
     playButton.textContent = 'PLAY';
     playButton.setAttribute('aria-label', 'Play');
+    playButton.addEventListener('click', this.click(() => this.game.startRun?.({ story: 'auto' })));
     mainActions.appendChild(playButton);
     el.appendChild(mainActions);
+
+    const transition = document.createElement('div');
+    transition.className = 'story-transition-layer hidden';
+    transition.setAttribute('aria-hidden', 'true');
+    transition.innerHTML = `<svg class="story-runner-mark" viewBox="0 0 64 64">
+      <circle class="runner-head" cx="39" cy="11" r="7" />
+      <path class="runner-body" d="M33 21 24 37l10 5 8-14 8 7 5-5-12-12z" />
+      <path class="runner-limb" d="m31 25-12-5-8 7m22 15-13 8-10 1m22-9 11 5 8 10" />
+      <path class="runner-limb" d="m42 22 10-8 7 2" />
+    </svg><div class="story-flash"></div><div class="story-fade"></div>`;
+    el.appendChild(transition);
+    this.storyTransitionLayer = transition;
 
     const corner = document.createElement('div');
     corner.className = 'corner-links';
@@ -312,13 +338,27 @@ export class MenuController {
     mk('Credits', 'credits');
     el.appendChild(corner);
 
-    el.addEventListener('click', () => {
-      try { this.game.audio?.play?.('start'); } catch { /* noop */ }
-      try { this.game.startRun?.(); } catch { /* engine not ready */ }
-    });
-
     this.tapEl = el;
     this.ui.registerScreen('tap', el);
+  }
+
+  _playStoryTransition() {
+    if (this._storyTransitioning) return;
+    this._storyTransitioning = true;
+    this.tapEl?.classList.add('story-starting');
+    this.storyTransitionLayer?.classList.remove('hidden');
+    this.tapEl?.querySelectorAll('button').forEach((button) => { button.disabled = true; });
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ||
+      this._settings().reducedMotion;
+    const beginStory = () => {
+      this.storyTransitionLayer?.classList.add('hidden');
+      this.tapEl?.classList.remove('story-starting');
+      this.tapEl?.querySelectorAll('button').forEach((button) => { button.disabled = false; });
+      this._storyTransitioning = false;
+      this.game.startRun?.({ story: 'force' });
+    };
+    if (reduced) beginStory();
+    else window.setTimeout(beginStory, 1120);
   }
 
   // Best score / best distance / lifetime coins on the title screen.
