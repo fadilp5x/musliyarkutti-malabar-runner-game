@@ -43,6 +43,7 @@ export class AcademyGate {
     this.audio = opts.audio || { play() {} };
     this._offset = GATE_OFFSET;
     this._revealed = false;
+    this._checkpointFlash = 0;
     this._lampMats = [];
     this._disposables = [];
     this._build();
@@ -190,18 +191,32 @@ export class AcademyGate {
     return this;
   }
 
+  // Align this same non-colliding academy arch with a kilometer checkpoint.
+  setCheckpoint(distanceM) {
+    this._offset = ((distanceM % LAP) + LAP) % LAP;
+    this._revealed = false;
+    return this;
+  }
+
+  flashCheckpoint() {
+    this._checkpointFlash = 0.85;
+  }
+
   update(dt, distanceM) {
+    this._checkpointFlash = Math.max(0, this._checkpointFlash - dt);
     const rel = this._positionAt(distanceM);
     // Sunlight feel: brighten as the player closes in. Intensity eases
     // toward its target (no snap when the gate wraps behind the player),
     // and the hue shifts warm → cool moonlit once the gate is far away.
     const t = THREE.MathUtils.clamp(1 - rel / REVEAL_RANGE, 0, 1);
-    const targetI = 0.9 + 2.8 * t;
+    const flash = this._checkpointFlash > 0 ? Math.sin((this._checkpointFlash / 0.85) * Math.PI) : 0;
+    const targetI = 0.9 + 2.8 * t + flash * 5;
     this._light.intensity += (targetI - this._light.intensity) * Math.min(1, dt * 3.5);
     const farK = THREE.MathUtils.clamp((rel - REVEAL_RANGE) / 24, 0, 1);
     this._light.color.lerpColors(_WARM_COL, _COOL_COL, farK * farK);
-    this._signMat.emissiveIntensity = 0.25 + 1.0 * t;
-    for (const m of this._lampMats) m.emissiveIntensity = 0.5 + 2.0 * t;
+    if (flash > 0) this._light.color.lerp(new THREE.Color(0xfff4c4), flash);
+    this._signMat.emissiveIntensity = 0.25 + 1.0 * t + flash * 2.5;
+    for (const m of this._lampMats) m.emissiveIntensity = 0.5 + 2.0 * t + flash * 4;
     if (rel < 3 && !this._revealed) {
       this._revealed = true;
       this.events.emit('academy_gate_reveal', { distanceM });
@@ -211,6 +226,8 @@ export class AcademyGate {
   }
 
   reset() {
+    this._offset = GATE_OFFSET;
+    this._checkpointFlash = 0;
     this.placeAt(0);
   }
 

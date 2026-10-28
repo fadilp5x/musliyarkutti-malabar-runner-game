@@ -42,6 +42,11 @@ export class HUD {
     this.multEl.textContent = 'x2';
     bar.appendChild(this.multEl);
 
+    this.comboEl = document.createElement('div');
+    this.comboEl.className = 'hud-combo hidden';
+    this.comboEl.setAttribute('aria-live', 'polite');
+    bar.appendChild(this.comboEl);
+
     const btns = document.createElement('div');
     btns.className = 'hud-btns';
 
@@ -89,6 +94,15 @@ export class HUD {
     this._chips = new Map();
     this._badgeCount = undefined;
     this._hintVisible = undefined;
+    this._coinAnimationId = 0;
+    this._floatCursor = 0;
+    this._floaters = Array.from({ length: 6 }, () => {
+      const el = document.createElement('span');
+      el.className = 'hud-float hidden';
+      el.setAttribute('aria-hidden', 'true');
+      this.root.appendChild(el);
+      return el;
+    });
 
     pauseBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -112,7 +126,16 @@ export class HUD {
     const v = document.createElement('span');
     v.className = 'value';
     v.textContent = initial;
+    let coin = null;
+    if (label === 'Coins') {
+      coin = document.createElement('span');
+      coin.className = 'coin-icon';
+      coin.setAttribute('aria-hidden', 'true');
+      coin.textContent = '\u0639';
+      v.classList.add('coin-counter');
+    }
     cell.appendChild(l);
+    if (coin) cell.appendChild(coin);
     cell.appendChild(v);
     bar.appendChild(cell);
     return v;
@@ -144,6 +167,8 @@ export class HUD {
     const coins = snap.coins ?? scoring.coins ?? 0;
     const dist = snap.distanceM ?? scoring.distanceM ?? 0;
     const mult = snap.multiplier ?? scoring.multiplier ?? 1;
+    const comboStreak = Math.max(0, Math.floor(snap.comboStreak ?? 0));
+    const comboMultiplier = Number(snap.comboMultiplier) || 1;
 
     const sInt = Math.floor(score);
     if (sInt !== this._score) {
@@ -156,8 +181,16 @@ export class HUD {
       this.distEl.textContent = dInt + ' m';
     }
     if (coins !== this._coins) {
+      const previousCoins = Number(this._coins);
       this._coins = coins;
-      this.coinsEl.textContent = String(coins);
+      if (Number.isFinite(previousCoins) && Number(coins) > previousCoins) {
+        this._animateCoinCounter(previousCoins, Number(coins));
+      } else {
+        this.coinsEl.textContent = String(coins);
+      }
+      this.coinsEl.classList.remove('coin-tick');
+      void this.coinsEl.offsetWidth;
+      this.coinsEl.classList.add('coin-tick');
     }
 
     const multOn = mult > 1;
@@ -166,6 +199,9 @@ export class HUD {
       this.multEl.classList.toggle('on', multOn);
       if (multOn) this.multEl.textContent = 'x' + mult;
     }
+    this.comboEl.classList.toggle('hidden', comboStreak === 0);
+    const comboText = `NEAR MISS ×${comboMultiplier.toFixed(2)} · ${comboStreak}`;
+    if (this.comboEl.textContent !== comboText) this.comboEl.textContent = comboText;
 
     // Power-up chips
     const active = snap.activePowerups ?? g.powerups?.active ?? {};
@@ -236,5 +272,30 @@ export class HUD {
       this._hintVisible = showHint;
       this.hintEl.classList.toggle('hidden', !showHint);
     }
+  }
+
+  _animateCoinCounter(from, to) {
+    const animationId = ++this._coinAnimationId;
+    const start = performance.now();
+    const duration = 200;
+    const tick = (now) => {
+      if (animationId !== this._coinAnimationId) return;
+      const p = Math.min(1, (now - start) / duration);
+      this.coinsEl.textContent = String(Math.floor(from + (to - from) * p));
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  showFloatingText(text, kind = 'coin') {
+    const el = this._floaters[this._floatCursor];
+    this._floatCursor = (this._floatCursor + 1) % this._floaters.length;
+    el.textContent = text;
+    el.className = `hud-float hud-float-${kind}`;
+    el.classList.remove('hidden');
+    void el.offsetWidth;
+    el.classList.add('is-rising');
+    clearTimeout(el._hideTimer);
+    el._hideTimer = setTimeout(() => el.classList.add('hidden'), 720);
   }
 }

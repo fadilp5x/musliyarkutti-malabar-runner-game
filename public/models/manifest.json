@@ -208,7 +208,7 @@
       "file": "models/shaytan-alt.glb",
       "fallback": "ShaytanPursuit",
       "fallbackModule": "src/game/ShaytanPursuit.js",
-      "status": "integrated Oct 13 2026 \u2014 fari-supplied alternate Shaytan; decimated 212k\u219238k tris for bloom/GPU compatibility (original kept as shaytan-alt-orig-212k.glb)"
+      "status": "integrated Oct 13 2026 \u2014 fari-supplied alternate Shaytan; decimated 212k\u219238k tris for bloom/GPU compatibility (original mesh archived outside public assets)"
     },
     "hero_mascot": {
       "file": "models/hero-mascot.glb",

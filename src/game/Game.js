@@ -23,10 +23,18 @@ import { Missions } from './Missions.js';
 import { ShaytanPursuit } from './ShaytanPursuit.js';
 import { ModelLoader } from '../assets/ModelLoader.js';
 import { Inventory } from './Inventory.js';
+import { Goals } from './Goals.js';
+import { Wardrobe } from './Wardrobe.js';
 import { UI } from '../ui/UI.js';
 // GRAPHICS OVERHAUL: renderer pipeline (bloom composer) + blob contact shadows.
 import { RenderPipeline } from './RenderPipeline.js';
 import { ContactShadows } from './ContactShadows.js';
+import { makeStreams } from './rng.js';
+import { SpawnEventHash } from './SpawnEventHash.js';
+import { SpawnDebugOverlay } from './SpawnDebugOverlay.js';
+import { ShieldBubble } from './ShieldBubble.js';
+import { NearMissCombo, effectiveScoreMultiplier } from './NearMissCombo.js';
+import { MilestoneTracker } from './MilestoneTracker.js';
 
 // Fixed-timestep simulation: 120 Hz steps, max 5 steps per frame, render each rAF.
 const STEP = 1 / 120;
@@ -82,6 +90,11 @@ export class Game {
     this._mVouchers = 0;
     this._reducedMotion = false;
     this._quality = 'high';
+    this._runElapsed = 0;
+    this._x2Powerup = false;
+    this.nearMissCombo = new NearMissCombo(4);
+    this.milestones = new MilestoneTracker(1000);
+    this._checkpointPreparedFor = null;
 
     // transient impact FX (shockwave rings) + dev collision overlay
     this._fx = [];
@@ -108,8 +121,17 @@ export class Game {
     this.wallet = null;
     this.missions = null;
     this.inventory = null;
+    this.goals = null;
+    this.wardrobe = null;
     this.ui = null;
     this.input = null;
+    this.spawnEventHash = new SpawnEventHash();
+    this.spawnDebugOverlay = null;
+    this._partySeed = null;
+    this._partyRound = null;
+    this._loadingAssetDone = 0;
+    // 11 SVG textures, the model manifest, and 4 startup model slots.
+    this._loadingAssetTotal = 16;
   }
 
   // --- lifecycle -----------------------------------------------------------
@@ -127,12 +149,21 @@ export class Game {
     // UI first (Oct 14, 2026): the loading screen must exist BEFORE the heavy
     // assets load so the 0-100% progress bar is honest from the first step.
     this.ui = new UI(this, document.getElementById('ui'));
-    this._reportProgress(3, 'Starting...');
+    if (new URLSearchParams(window.location.search).get('debug') === '1') {
+      this.spawnDebugOverlay = new SpawnDebugOverlay();
+      this._updateSpawnDebug();
+    }
+    this._reportProgress(0, 'Starting...');
 
     // 1. Assets first — every SVG texture the world/managers need.
-    const textures = await this.assetLoader.loadAll();
+    const textures = await this.assetLoader.loadAll({
+      onProgress: ({ loaded, total }) => {
+        this._loadingAssetDone = loaded;
+        this._reportAssetProgress(`Loading road art ${loaded}/${total}`);
+      },
+    });
     void textures;
-    this._reportProgress(15, 'Textures loaded...');
+    this._reportLoadingStatus('Road art ready...');
 
     // 2. Renderer / scene / camera
     // GRAPHICS OVERHAUL: explicit sRGB output + ACES filmic tone mapping.
@@ -163,18 +194,19 @@ export class Game {
     this._pipeline = new RenderPipeline(this.renderer, this.scene, this.camera);
     this._contactShadows = new ContactShadows(this.scene);
     this.setQuality(this._quality);
-    this._reportProgress(25, 'Renderer ready...');
+    this._reportLoadingStatus('Preparing the 3D scene...');
 
     // 3. Player
     this.avatar = new PlayerAvatar(this.scene);
     this.player = new PlayerController(this.avatar, this.events);
+    this.shieldBubble = new ShieldBubble(this.avatar.group, { quality: this._quality, reducedMotion: this._reducedMotion });
 
     // 4. Library intro scene (uses the avatar)
     this.library = new LibraryScene(this.scene, this.assetLoader, this.avatar, this.events);
     this.library.setCamera(this.camera);
     if (this._reducedMotion) this.library.reducedMotion = true;
     await this.library.init();
-    this._reportProgress(40, 'Library built...');
+    this._reportLoadingStatus('Preparing the library...');
 
     // Street pursuit (cinematic workstream): follows the player for ~10s
     // after each run begins, then dissolves and stays dormant.
@@ -188,20 +220,20 @@ export class Game {
     this.modelLoader = new ModelLoader({ scene: this.scene });
     await this.modelLoader.init();
     this.pursuit.setModelLoader(this.modelLoader);
-    this._reportProgress(48, 'Models ready...');
-    // Hero mascot (Oct 14, 2026): fari's GLB on the title screen. Loaded here
-    // (not lazily) so the progress bar stays honest — 7.7MB is the big one.
-    try {
-      await this._loadHeroMascot();
-      this._reportProgress(62, 'Mascot loaded...');
-    } catch (e) {
-      console.warn('[game] hero mascot load failed (title will show without it):', e);
-      this._reportProgress(62, 'Mascot skipped...');
-    }
+    this._loadingAssetDone += 1; // model manifest settled (real or fallback)
+    this._reportAssetProgress('Preparing traffic models...');
+    this.modelLoader.setAssetProgressListener((slotName) => {
+      this._loadingAssetDone = Math.min(this._loadingAssetTotal, this._loadingAssetDone + 1);
+      this._reportAssetProgress(`Loading ${slotName.replaceAll('_', ' ')}...`);
+    });
     // Apply the saved Shaytan variant (lazy: the GLB loads in the background
     // only when a non-classic variant is selected — never blocks boot).
+    const shaytanVariant = data.settings.shaytan || 'classic';
+    if (shaytanVariant === 'reaper' || shaytanVariant === 'shaythaan') {
+      this._loadingAssetTotal += 1;
+    }
     try {
-      this.pursuit.setVariant(data.settings.shaytan || 'classic');
+      await this.pursuit.setVariant(shaytanVariant);
     } catch (e) {
       console.warn('[game] shaytan variant init failed:', e);
     }
@@ -222,11 +254,12 @@ export class Game {
     // fari's GLB traffic + windmill (lazy: failures keep procedural models).
     try {
       await this.world.loadVehicleModels(this.modelLoader);
-      this._reportProgress(78, 'Vehicles loaded...');
+      this._reportLoadingStatus('Roadside details ready...');
     } catch (e) {
       console.warn('[game] vehicle GLB load failed:', e);
-      this._reportProgress(78, 'Vehicles skipped...');
+      this._reportLoadingStatus('Using available roadside details...');
     }
+    this.modelLoader.setAssetProgressListener(null);
     this.landmarks = new LandmarkManager(this.runnerRoot, this.events, this.assetLoader);
     // Shamsul Huda academy entrance gate: spans all 3 lanes at ~22 m, visual only.
     this.academyGate = new AcademyGate(this.runnerRoot, this.assetLoader, {
@@ -266,20 +299,25 @@ export class Game {
     this.missions.load(data.missions);
     this.inventory = new Inventory();
     this.inventory.load(data.inventory);
+    this.goals = new Goals();
+    this.goals.load(data.goals);
+    this.wardrobe = new Wardrobe();
+    this.wardrobe.load(data.wardrobe);
+    this.avatar.setSkin(this.wardrobe.selected);
 
     // 6. Wiring (UI was created at the top of init so the loading screen
     // shows progress from the first step; it maps states to screens itself
     // via 'statechange').
     this._wireEvents();
     this.input = new InputManager((action) => this._onAction(action));
-    this._reportProgress(88, 'Almost there...');
+    this._reportLoadingStatus('Almost there...');
 
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this._doPause();
     });
 
     // 7. Intro tableau, then wait for a tap (UI shows 'tap' on statechange)
-    this._reportProgress(94, 'Lighting the lamps...');
+    this._reportLoadingStatus('Lighting the lamps...');
     await this.library.playIntro();
     this.avatar.setAnim('reading');
     this._reportProgress(100, 'Ready!');
@@ -298,6 +336,17 @@ export class Game {
     }
 
     this.setState(STATES.LIBRARY);
+    this._loadHeroMascotAfterFirstPaint();
+  }
+
+  _loadHeroMascotAfterFirstPaint() {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        this._loadHeroMascot().catch((error) => {
+          console.warn('[game] hero mascot load failed (title will use the library scene without it):', error);
+        });
+      });
+    });
   }
 
   // Hero mascot (Oct 14, 2026): fari's GLB as the title-screen greeter.
@@ -395,9 +444,20 @@ export class Game {
     } catch { /* loading UI is best-effort */ }
   }
 
+  _reportAssetProgress(label) {
+    const pct = Math.floor((this._loadingAssetDone / this._loadingAssetTotal) * 90);
+    this._reportProgress(pct, label);
+  }
+
+  _reportLoadingStatus(label) {
+    const pct = Math.floor((this._loadingAssetDone / this._loadingAssetTotal) * 90);
+    this._reportProgress(pct, label);
+  }
+
   setQuality(q) {
     const quality = q === 'low' || q === 'medium' ? q : 'high';
     this._quality = quality;
+    this.ui?.particles?.qualityChanged?.();
     const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
     const pr = quality === 'low' ? 1
       : quality === 'medium' ? Math.min(dpr, 1.5)
@@ -414,6 +474,7 @@ export class Game {
       this._pipeline.setBloom(quality === 'high');
     }
     if (this.world) this.world.setQuality(quality);
+    this.shieldBubble?.setQuality(quality);
   }
 
   setState(s) {
@@ -452,8 +513,11 @@ export class Game {
 
   // All players enter the same runner scene on the room's shared countdown.
   // Bypass the solo intro and first-run tutorial so race starts stay in sync.
-  startPartyRace() {
+  startPartyRace({ seed, round } = {}) {
     if (this.state !== STATES.LIBRARY && this.state !== STATES.GAMEOVER) return false;
+    this._partySpawnStreams = seed === undefined ? null : makeStreams(seed, round);
+    this._partySeed = seed ?? null;
+    this._partyRound = round ?? null;
     this._partyRaceStarting = true;
     try { this._beginRunner(); }
     finally { this._partyRaceStarting = false; }
@@ -467,6 +531,31 @@ export class Game {
       d.tutorialPreference = choice; // 'with' | 'without'
       this.save.save(d);
     } catch {}
+  }
+
+  claimGoal(id) {
+    const reward = this.goals?.claim?.(id) || 0;
+    if (!reward) return 0;
+    this._bankedCoins = Math.floor(this.save.load().coins || 0) + reward;
+    this.save.save({ coins: this._bankedCoins, goals: this.goals.serialize() });
+    return reward;
+  }
+
+  buySkin(id) {
+    const balance = Math.floor(this.save.load().coins || 0);
+    this._bankedCoins = balance;
+    if (!this.wardrobe?.buy?.(id, balance)) return false;
+    const skin = this.wardrobe.skins.find((entry) => entry.id === id);
+    this._bankedCoins = balance - skin.cost;
+    this.save.save({ coins: this._bankedCoins, wardrobe: this.wardrobe.serialize() });
+    return true;
+  }
+
+  selectSkin(id) {
+    if (!this.wardrobe?.select?.(id)) return false;
+    this.avatar?.setSkin?.(id);
+    this.save.save({ wardrobe: this.wardrobe.serialize() });
+    return true;
   }
 
   // Continue after the tutorial choice overlay is dismissed.
@@ -598,6 +687,7 @@ export class Game {
   _wireEvents() {
     this.events.on('coin', (n) => {
       this.scoring.addCoins(n || 1);
+      this.ui?.hud?.showFloatingText?.(`+${n || 1}`, (n || 1) >= 10 ? 'gold' : 'coin');
       const now = performance.now();
       if (now - this._coinSfxT > 70) {
         this._coinSfxT = now;
@@ -605,21 +695,32 @@ export class Game {
       }
     });
     this.events.on('nearmiss', () => {
+      this.nearMissCombo.record(this._runElapsed);
+      this._syncScoreMultiplier();
       this.scoring.addNearMiss();
       this.audio.play('nearmiss');
     });
     this.events.on('powerup', (type) => {
       this.audio.play('powerup');
-      if (type === 'multiplier') this.scoring.multiplier = 2;
+      if (type === 'multiplier') { this._x2Powerup = true; this._syncScoreMultiplier(); }
+      if (type === 'shield') this.shieldBubble?.activate();
     });
     this.events.on('powerupEnd', (type) => {
-      if (type === 'multiplier') this.scoring.multiplier = 1;
+      if (type === 'multiplier') { this._x2Powerup = false; this._syncScoreMultiplier(); }
+      if (type === 'shield') this.shieldBubble?.deactivate();
+    });
+    this.events.on('milestone', ({ distanceM } = {}) => {
+      this.academyGate?.flashCheckpoint?.();
+      this.audio.play('academy_gate_reveal');
+      this.ui?.hud?.showFloatingText?.(`+50 · ${Math.floor(distanceM || 0)} m`, 'gold');
     });
     this.events.on('hit', () => this.audio.play('hit'));
     // Crash from ObstacleManager: shield or scholar's glideboard absorbs one hit
     // (destroying the obstacle); otherwise the run ends.
     this.events.on('crash', (info = {}) => {
       if (this.state !== STATES.RUNNER) return;
+      this.nearMissCombo.reset();
+      this._syncScoreMultiplier();
       const idx = typeof info.index === 'number' ? info.index : -1;
       // Smartphone portal: blue-cyan distortion burst + dedicated SFX hook,
       // whether protection absorbs it or the run ends.
@@ -631,6 +732,7 @@ export class Game {
         this._flashImpact('rgba(80,200,255,0.5)');
       }
       if (this.powerups.has('shield')) {
+        this.shieldBubble?.absorb();
         this.powerups.consume('shield');
         if (idx >= 0) this.obstacles.destroyAt(idx);
         this.audio.play('hit');
@@ -671,6 +773,7 @@ export class Game {
     this.events.on('settings', (patch) => this._applySettings(patch));
     // Academy gate reveal: subtle camera tilt as the player passes under it.
     this.events.on('academy_gate_reveal', () => {
+      if (this._checkpointPreparedFor !== null) this.academyGate?.flashCheckpoint?.();
       if (!this._reducedMotion) this.cameraCtl.shake(0.15);
     });
   }
@@ -682,8 +785,10 @@ export class Game {
     // Shield / glideboard absorb the hit: consume the protection, burst the
     // crowd apart visually, destroy nothing else — no stumble, no death.
     if (this.powerups.has('shield') || this.powerups.has('glideboard')) {
-      if (this.powerups.has('shield')) this.powerups.consume('shield');
-      else this.powerups.consume('glideboard');
+      if (this.powerups.has('shield')) {
+        this.shieldBubble?.absorb();
+        this.powerups.consume('shield');
+      } else this.powerups.consume('glideboard');
       this._spawnShockwave(x, 1.0, 0, 0x9adcff, 1.8);
       this.audio.play('hit');
       return;
@@ -715,6 +820,17 @@ export class Game {
     mesh.position.set(x, y, z);
     (this.runnerRoot || this.scene).add(mesh);
     this._fx.push({ mesh, t: 0, dur: 0.45, maxR });
+  }
+
+  _spawnCrashPuff(x, y, z) {
+    if (!this.runnerRoot) return;
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.28, 10, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffedc2, transparent: true, opacity: 0.62, depthWrite: false })
+    );
+    mesh.position.set(x, y, z);
+    this.runnerRoot.add(mesh);
+    this._fx.push({ mesh, t: 0, dur: 0.55, maxR: 2.2 });
   }
 
   _updateFx(dt) {
@@ -764,6 +880,7 @@ export class Game {
     this.save.save({ settings: next });
     this.audio.setEnabled(next.sound);
     this._reducedMotion = next.reducedMotion;
+    this.shieldBubble?.setReducedMotion(next.reducedMotion);
     if (this.library) this.library.reducedMotion = next.reducedMotion;
     if (this.pursuit) this.pursuit.setReducedMotion(next.reducedMotion);
     // GRAPHICS OVERHAUL: one call applies pixel ratio, shadow map, bloom,
@@ -922,8 +1039,34 @@ export class Game {
   }
 
   _beginRunner() {
+    const streams = this._partyRaceStarting ? this._partySpawnStreams : null;
+    this._activePartySpawn = Boolean(streams);
+    this.spawnEventHash.reset(streams ? this._partySeed : null, streams ? this._partyRound : null);
+    this.obstacles.rng = streams?.obstacles ?? Math.random;
+    this.obstacles.onSpawn = (event) => {
+      if (this._activePartySpawn) this.spawnEventHash.record(event);
+    };
+    this.collectibles.setRandomStreams({
+      coins: streams?.coins ?? Math.random,
+      vouchers: streams?.vouchers ?? Math.random,
+    });
+    this.collectibles.onSpawn = (event) => {
+      if (this._activePartySpawn) this.spawnEventHash.record(event);
+    };
+    this.powerups.rng = streams?.powerups ?? Math.random;
+    this.powerups.onSpawn = (event) => {
+      if (this._activePartySpawn) this.spawnEventHash.record(event);
+    };
+    this.vouchers.rng = streams?.vouchers ?? Math.random;
+    this.pursuit?.setRandomSource?.(streams?.shaytan ?? Math.random);
     this.scoring.resetRun();
     this.scoring.multiplier = 1;
+    this._x2Powerup = false;
+    this._runElapsed = 0;
+    this.nearMissCombo.reset();
+    this.milestones.reset();
+    this._checkpointPreparedFor = null;
+    this.shieldBubble?.reset();
     this.vouchers.reset();    this.player.reset();
     this.obstacles.reset();
     this.collectibles.reset();
@@ -947,6 +1090,8 @@ export class Game {
     this._mCoins = 0;
     this._mNear = 0;
     this._mVouchers = 0;
+    this._goalDistance = 0;
+    this._goalSaveBucket = 0;
     this._clearFx();
     if (this.effects) this.effects.reset();
     // First-time tutorial: enter guided mode instead of free run.
@@ -967,6 +1112,18 @@ export class Game {
     this.setState(STATES.RUNNER); // UI shows HUD via 'statechange'
     this.audio.play('start');
     if (this.pursuit) this.pursuit.start();
+    this._updateSpawnDebug();
+  }
+
+  _updateSpawnDebug() {
+    if (!this.spawnDebugOverlay) return;
+    this.spawnDebugOverlay.update({
+      seed: this._activePartySpawn ? this._partySeed : null,
+      round: this._activePartySpawn ? this._partyRound : null,
+      distance: this.scoring?.distanceM || 0,
+      hash: this.spawnEventHash.value(),
+      events: this.spawnEventHash.count,
+    });
   }
 
   // Dispose any lingering impact rings (fresh run = clean slate).
@@ -1013,6 +1170,8 @@ export class Game {
       wallet: this.wallet.serialize(),
       missions: this.missions.serialize(),
       inventory: this.inventory.serialize(),
+      goals: this.goals.serialize(),
+      wardrobe: this.wardrobe.serialize(),
       vouchers: { lastSpawnM: this.vouchers.lastSpawnM },
     });
   }
@@ -1086,6 +1245,9 @@ export class Game {
 
   _updateRunner(dt) {
     const speed = this._speed();
+    this._runElapsed += dt;
+    this.nearMissCombo.update(this._runElapsed);
+    this._syncScoreMultiplier();
 
     // input → player → powerups → world → landmarks → obstacles →
     // collectibles → scoring → voucher check → missions → hud → camera → avatar
@@ -1093,6 +1255,11 @@ export class Game {
     this.powerups.update(dt, speed, this.scoring.distanceM, this.player, this.avatar);
     this.world.update(dt, speed, this.scoring.distanceM, this._quality);
     this.landmarks.update(dt, speed, this.scoring.distanceM);
+    const nextMilestone = this.milestones.nextDistanceM;
+    if (this._checkpointPreparedFor !== nextMilestone && this.scoring.distanceM >= nextMilestone - 25) {
+      this.academyGate.setCheckpoint(nextMilestone);
+      this._checkpointPreparedFor = nextMilestone;
+    }
     this.academyGate.update(dt, this.scoring.distanceM);
 
     const box = this.player.getBox();
@@ -1115,6 +1282,11 @@ export class Game {
       jetpack: this.player.flyY > 2,
     });
     this.scoring.addDistance(speed * dt);
+    for (const distanceM of this.milestones.crossed(this.scoring.distanceM)) {
+      this.scoring.addBonus(50);
+      this.events.emit('milestone', { distanceM, bonus: 50 });
+      this._checkpointPreparedFor = null;
+    }
 
     const freeLanes = typeof this.obstacles.getFreeLanes === 'function'
       ? this.obstacles.getFreeLanes()
@@ -1124,13 +1296,14 @@ export class Game {
     // recordSpawn at spawn time enforces the 120 m minimum interval.
     if (this.vouchers.shouldSpawn(this.scoring.distanceM)) {
       const lane = freeLanes.length > 0
-        ? freeLanes[Math.floor(Math.random() * freeLanes.length)]
+        ? freeLanes[Math.floor(this.vouchers.rng() * freeLanes.length)]
         : 1;
-      this.collectibles.spawnVoucher(lane);
+      this.collectibles.spawnVoucher(lane, this.scoring.distanceM);
       this.vouchers.recordSpawn(this.scoring.distanceM);
     }
 
     this.powerups.trySpawn(this.scoring.distanceM, freeLanes);
+    this._updateSpawnDebug();
 
     // Missions.update takes DELTAS for coins/nearMisses/vouchers (absolute run
     // distance for run500). Track last-seen values per run.
@@ -1145,6 +1318,22 @@ export class Game {
       this._mNear = this.scoring.nearMisses;
       this._mVouchers = this._runVouchers;
       this.missions.update(stats);
+      const distanceDelta = Math.max(0, this.scoring.distanceM - this._goalDistance);
+      this._goalDistance = this.scoring.distanceM;
+      const goalChanged = this.goals.update({
+        distance: distanceDelta,
+        runDistance: this.scoring.distanceM,
+        coins: stats.coins,
+        nearMisses: stats.nearMisses,
+        vouchers: stats.vouchers,
+      });
+      if (goalChanged) {
+        const bucket = Math.floor(this.scoring.distanceM / 25);
+        if (stats.coins > 0 || stats.nearMisses > 0 || stats.vouchers > 0 || bucket > this._goalSaveBucket) {
+          this._goalSaveBucket = bucket;
+          this.save.save({ goals: this.goals.serialize() });
+        }
+      }
     }
 
     // Stumble anim recovery
@@ -1165,6 +1354,8 @@ export class Game {
       voucherUnlocked: this.scoring.distanceM >= VOUCHER_UNLOCK_M,
       canSpawn: this.vouchers.canSpawn(this.scoring.distanceM),
       speed,
+      comboStreak: this.nearMissCombo.streak,
+      comboMultiplier: this.nearMissCombo.multiplier,
     });
 
     // Street pursuit (S5): playerZ is 0 in RUNNER (the world scrolls past the
@@ -1172,6 +1363,8 @@ export class Game {
     if (this.pursuit) this.pursuit.update(dt, 0, speed);
     this.cameraCtl.update(dt, this.player.x, 'runner', speed);
     this.avatar.update(dt);
+    this.shieldBubble?.setActive(this.powerups.has('shield'));
+    this.shieldBubble?.update(dt, this.powerups.active.shield || 0);
     // Audio workstream (A4): jetpack thrust loop follows player.flyY.
     // (Footstep emission skipped here on purpose: PlayerController already
     // emits 'footstep' each grounded stride and AudioManager throttles it —
@@ -1193,5 +1386,11 @@ export class Game {
       });
     }
     this._updateFx(dt);
+  }
+
+  _syncScoreMultiplier() {
+    if (!this.scoring) return;
+    const combo = this.nearMissCombo?.multiplier || 1;
+    this.scoring.multiplier = effectiveScoreMultiplier(combo, this._x2Powerup);
   }
 }

@@ -25,7 +25,7 @@ animated character GLB exists** — all six integrated models are static meshes
 
 Asset prep notes (all documented, reversible, originals kept):
 - Windmill: 4 giant terrain Plane nodes removed via script (`public/models/windmill.glb` is the cleaned copy; fari's original untouched in `workspace/user/files/`).
-- Shaythaan: decimated 212k→38k tris with three.js SimplifyModifier — the 212k version caused a black-screen artifact with UnrealBloomPass (High quality). 38k renders correctly. Original kept as `public/models/shaytan-alt-orig-212k.glb`.
+- Shaythaan: decimated 212k→38k tris with three.js SimplifyModifier — the 212k version caused a black-screen artifact with UnrealBloomPass (High quality). 38k renders correctly. Original archived at `_archive/models/shaytan-alt-orig-212k.glb`, outside the deployment publish directory.
 - Material normalization: extreme metalness (>0.6, no envmap) clamped to 0.3 at load — fully-metallic PBR renders black without environment lighting.
 - Attribution: Sketchfab downloads — fire truck / police car by arunangshubanerjee, reaper by pixellabs. Check licenses before public distribution.
 

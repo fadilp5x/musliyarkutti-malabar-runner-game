@@ -121,20 +121,22 @@ export class ObstacleManager {
     this.events = events || { on() {}, emit() {} };
     this.assetLoader = assetLoader;
     this.rng = rng;
+    this.onSpawn = null;
+    this.currentDistanceM = 0;
     /** live obstacles: { type, lane, z, group, box, kind, passed, hit, w, h, drift } */
     this.obstacles = [];
 
     this._textures = null;
     this._texInitStarted = false;
 
-    this._distSinceRow = 0;
+    this._distSinceRow = 0; // travelled metres since the previous row
     this._t = 0;
 
     // shaytan surge state
     this._surge = 'idle';      // idle | warning | active
-    this._surgeT = 0;
-    this._surgeClock = 0;
-    this._nextSurgeIn = 12;    // seconds after the 300 m gate
+    this._surgeT = 0; // travelled metres through the warning / active phase
+    this._surgeClock = 0; // travelled metres after the 300 m gate
+    this._nextSurgeIn = 120;   // metres after the 300 m gate
     this._warnMesh = null;
 
     // portal retrigger cooldown (per-obstacle ob.hit is the primary lockout)
@@ -181,7 +183,7 @@ export class ObstacleManager {
     for (let k = 0; k < n; k++) {
       const fig = this._buildPedestrianFigure();
       fig.position.x = xs[k];
-      fig.position.z = (this.rng() - 0.5) * 0.2; // slight depth stagger
+      fig.position.z = (Math.random() - 0.5) * 0.2; // cosmetic depth stagger
       g.add(fig);
     }
     return g;
@@ -274,10 +276,11 @@ export class ObstacleManager {
       passed: false, hit: false,
       w: def.plane[0], h: def.plane[1],
       drift: type === 'pedestrian' ? 0.85 : 1, // pedestrians approach slightly slower
-      bob: this.rng() * Math.PI * 2,
+      bob: Math.random() * Math.PI * 2,
       surge: !!def.surge,
     };
     this.obstacles.push(ob);
+    this.onSpawn?.({ kind: 'obstacle', type, lane, distanceM: this.currentDistanceM });
     return ob;
   }
 
@@ -411,28 +414,28 @@ export class ObstacleManager {
     this._surgeT = 0;
   }
 
-  _updateSurge(dt, distanceM) {
+  _updateSurge(dt, distanceM, speed) {
     if (this._surge === 'idle') {
       if (distanceM > 300) {
-        this._surgeClock += dt;
+        this._surgeClock += speed * dt;
         if (this._surgeClock >= this._nextSurgeIn) this._startWarning();
       }
       return;
     }
-    this._surgeT += dt;
+    this._surgeT += speed * dt;
     if (this._surge === 'warning') {
       if (this._warnMesh) {
-        const s = 7 * (1 + 0.12 * Math.sin(this._surgeT * 14));
+        const s = 7 * (1 + 0.12 * Math.sin((this._surgeT / 10) * 14));
         this._warnMesh.scale.set(s / 7, s / 7, 1);
       }
-      if (this._surgeT >= 2) this._fireSurge();
+      if (this._surgeT >= 20) this._fireSurge();
     } else if (this._surge === 'active') {
       const wallsLeft = this.obstacles.some((o) => o.surge);
       if (!wallsLeft) {
-        // walls passed/destroyed -> cooldown 40-60 s
+        // walls passed/destroyed -> cooldown equivalent to 40-60 s at 10 m/s
         this._surge = 'idle';
         this._surgeClock = 0;
-        this._nextSurgeIn = 40 + this.rng() * 20;
+        this._nextSurgeIn = 400 + this.rng() * 200;
       }
     }
   }
@@ -440,6 +443,7 @@ export class ObstacleManager {
   // ----- per-frame
   update(dt, speed, distanceM, playerBox, playerLane, mods = {}) {
     this._t += dt;
+    this.currentDistanceM = distanceM;
 
     // row generation: rows every gap metres. Speed workstream (Oct 2026):
     // widened for the 28 m/s cap — preserves the old 0.717 s minimum reaction
@@ -452,7 +456,7 @@ export class ObstacleManager {
     }
 
     // shaytan surge state machine
-    this._updateSurge(dt, distanceM);
+    this._updateSurge(dt, distanceM, speed);
 
     // portal retrigger cooldown
     if (this._portalCd > 0) this._portalCd -= dt;
@@ -564,10 +568,11 @@ export class ObstacleManager {
       this._warnMesh = null;
     }
     this._distSinceRow = 0;
+    this.currentDistanceM = 0;
     this._surge = 'idle';
     this._surgeT = 0;
     this._surgeClock = 0;
-    this._nextSurgeIn = 12;
+    this._nextSurgeIn = 120;
     this._portalCd = 0;
     // pre-populate a few rows so the road ahead isn't empty at run start
     // (base speed is now 10 m/s; same formula as update())

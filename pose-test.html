@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#101a2f" />
+    <title>Malabar Runner · Pose Test</title>
+  </head>
+  <body>
+    <main id="pose-test">
+      <canvas id="pose-canvas" aria-label="Runner pose preview"></canvas>
+      <section class="pose-controls" aria-label="Animation preview controls">
+        <p class="eyebrow">MALABAR RUNNER · ANIMATION CHECK</p>
+        <h1 id="pose-title">Run · 10 m/s</h1>
+        <p>Cycle every pose, or select one to inspect it at each speed.</p>
+        <div id="pose-buttons" class="pose-buttons"></div>
+        <div class="speed-row" id="speed-buttons"></div>
+        <button id="pose-cycle" class="cycle-button" type="button">Cycle all poses</button>
+        <output id="pose-details">Fixed-step preview · 120 Hz</output>
+      </section>
+    </main>
+    <script type="module" src="/src/game/PoseTest.js"></script>
+  </body>
+</html>

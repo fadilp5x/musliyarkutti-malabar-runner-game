@@ -10,7 +10,7 @@ const DEFS = {
   jetpack:        { dur: 8,        letter: 'J',  color: '#f97316' },
   magnet:         { dur: 10,       letter: 'M',  color: '#ef4444' },
   multiplier:     { dur: 12,       letter: '×2', color: '#06b6d4' },
-  shield:         { dur: 15,       letter: 'S',  color: '#3b82f6' },
+  shield:         { dur: 15,       letter: 'S',  color: '#D99A00' },
   glideboard:     { dur: Infinity, letter: 'G',  color: '#22c55e' },
   headstart:      { dur: 0,        letter: 'H',  color: '#a855f7', instant: true },
   superheadstart: { dur: 0,        letter: 'H+', color: '#eab308', instant: true },
@@ -29,8 +29,8 @@ const SPAWN_WEIGHTS = [
 const SPAWN_Z = -100;
 const DESPAWN_Z = 12;
 
-function pickWeighted(pairs) {
-  let r = Math.random();
+function pickWeighted(rng, pairs) {
+  let r = rng();
   for (const [v, w] of pairs) {
     r -= w;
     if (r <= 0) return v;
@@ -67,14 +67,17 @@ function pickupTexture(type) {
 }
 
 export class PowerUpManager {
-  constructor(scene, events) {
+  constructor(scene, events, rng = Math.random) {
     this.scene = scene;
     this.events = events || { on() {}, emit() {} };
+    this.rng = rng;
     /** active powerups: type -> remaining seconds (glideboard: Infinity until hit) */
     this.active = {};
     /** live pickups: { type, lane, z, mesh, bob } */
     this.pickups = [];
     this._lastSpawnM = 0;
+    this._nextSpawnM = 90;
+    this.onSpawn = null;
   }
 
   has(type) {
@@ -102,16 +105,15 @@ export class PowerUpManager {
   }
 
   /**
-   * Maybe spawn a pickup. Call each frame with the run distance and the
+   * Maybe spawn a pickup. Call each simulation step with the run distance and the
    * obstacle manager's getFreeLanes(). Spawns every 90-160 m in a free lane.
    */
   trySpawn(distanceM, freeLanes = [0, 1, 2]) {
-    const gap = 90 + Math.random() * 70;
-    if (distanceM - this._lastSpawnM < gap) return;
+    if (distanceM < this._nextSpawnM) return;
     if (!freeLanes || freeLanes.length === 0) return;
     this._lastSpawnM = distanceM;
-    const lane = freeLanes[(Math.random() * freeLanes.length) | 0];
-    const type = pickWeighted(SPAWN_WEIGHTS);
+    const lane = freeLanes[(this.rng() * freeLanes.length) | 0];
+    const type = pickWeighted(this.rng, SPAWN_WEIGHTS);
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(1.15, 1.15),
       new THREE.MeshBasicMaterial({ map: pickupTexture(type), transparent: true, side: THREE.DoubleSide })
@@ -119,6 +121,8 @@ export class PowerUpManager {
     mesh.position.set(LANES[lane], 1.25, SPAWN_Z);
     this.scene.add(mesh);
     this.pickups.push({ type, lane, z: SPAWN_Z, mesh, bob: Math.random() * 6.28 });
+    this.onSpawn?.({ kind: 'powerup', type, lane, distanceM });
+    this._nextSpawnM = distanceM + 90 + this.rng() * 70;
   }
 
   update(dt, speed, distanceM, player, avatar) {
@@ -170,5 +174,6 @@ export class PowerUpManager {
     for (const p of this.pickups) this.scene.remove(p.mesh);
     this.pickups = [];
     this._lastSpawnM = 0;
+    this._nextSpawnM = 90 + this.rng() * 70;
   }
 }

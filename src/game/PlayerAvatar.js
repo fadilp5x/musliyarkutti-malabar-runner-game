@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { DEFAULT_SKIN_ID, getAvatarSkin } from './AvatarSkins.js';
 
 // ---------------------------------------------------------------------------
 // PlayerAvatar — stylized procedural hero rig for MUSLIYARKUTTI: MALABAR RUNNER.
@@ -37,6 +38,11 @@ export const AVATAR_ANIMS = [
   'idle', 'reading', 'run', 'jump', 'slide', 'left', 'right',
   'collect', 'stumble', 'fall', 'jetpack', 'glide', 'standup', 'react',
 ];
+// Server room snapshots send these exact names. Keep the mapping explicit so
+// network animation names cannot silently fall through to idle.
+export const SERVER_ANIM_POSES = Object.freeze({
+  run: 'run', jump: 'jump', slide: 'slide', glide: 'glide', jetpack: 'jetpack', fall: 'fall',
+});
 
 const HIPS_BASE_Y = 0.95; // waist height; total rig height ~1.7 (+ turban)
 
@@ -58,7 +64,7 @@ function basePose() {
     headRX: 0, headRY: 0, headRZ: 0,
     armLx: 0, armLz: 0, armRx: 0, armRz: 0,
     foreLx: 0, foreRx: 0,
-    legLx: 0, legRx: 0,
+    legLx: 0, legRx: 0, kneeLx: 0, kneeRx: 0,
     leanZ: 0, fallX: 0, dropY: 0,
     tailX: 0, tailTipX: 0, hemX: 0, hemZ: 0,
   };
@@ -76,13 +82,16 @@ export class PlayerAvatar {
     this.groupOffsetY = 0; // extra y offset (used by 'fall'); controller adds it
     this.anim = 'idle';
     this.animT = 0;
+    this._landingT = 0;
     // Run-cycle stride: PlayerController advances `runPhase` each fixed step
     // at 14 * (speed / 8) rad/s and sets `runRate`; the run poses read
     // `runPhase` so leg swing matches ground speed (footsteps stay in sync).
     this.runRate = 1;
     this.runPhase = 0;
     this.parts = {};
+    this.skinId = DEFAULT_SKIN_ID;
     this._buildRig();
+    this.setSkin(DEFAULT_SKIN_ID);
     this._pose = basePose();
     this._prev = basePose();
     this._blendT = 1; // 0..1 transition blend on setAnim
@@ -107,7 +116,8 @@ export class PlayerAvatar {
     });
     const matSkin = new THREE.MeshStandardMaterial({ color: SKIN, roughness: 0.55 });
     const matKara = new THREE.MeshStandardMaterial({ color: KARA, roughness: 0.85 });
-    const matKaraDark = new THREE.MeshStandardMaterial({ color: KARA_DARK, roughness: 0.85 });
+    const matLungiBorder = new THREE.MeshStandardMaterial({ color: KARA, roughness: 0.85 });
+    const matLungiBorderDark = new THREE.MeshStandardMaterial({ color: KARA_DARK, roughness: 0.85 });
     const matDark = new THREE.MeshStandardMaterial({ color: DARK, roughness: 0.5 });
     const matSmile = new THREE.MeshStandardMaterial({ color: SMILE, roughness: 0.6 });
     const matGold = new THREE.MeshStandardMaterial({ color: GOLD, roughness: 0.35, metalness: 0.6 });
@@ -144,8 +154,8 @@ export class PlayerAvatar {
     );
     seam.castShadow = false;
     // kara border at the hem
-    mesh(new THREE.CylinderGeometry(0.243, 0.247, 0.05, 18), matKara, hips, 0, -0.52, 0);
-    mesh(new THREE.CylinderGeometry(0.247, 0.249, 0.018, 18), matKaraDark, hips, 0, -0.552, 0);
+    mesh(new THREE.CylinderGeometry(0.243, 0.247, 0.05, 18), matLungiBorder, hips, 0, -0.52, 0);
+    mesh(new THREE.CylinderGeometry(0.247, 0.249, 0.018, 18), matLungiBorderDark, hips, 0, -0.552, 0);
 
     // ---- legs: thigh + knee + shin on hip pivots, bare feet ----
     const makeLeg = (sx) => {
@@ -154,13 +164,16 @@ export class PlayerAvatar {
       hips.add(leg);
       mesh(new THREE.CylinderGeometry(0.066, 0.056, 0.44, 12), matSkin, leg, 0, -0.22, 0);
       mesh(new THREE.SphereGeometry(0.058, 10, 8), matSkin, leg, 0, -0.44, 0); // knee
-      mesh(new THREE.CylinderGeometry(0.054, 0.042, 0.42, 12), matSkin, leg, 0, -0.65, 0);
-      const foot = mesh(new THREE.SphereGeometry(0.075, 12, 10), matSkin, leg, 0, -0.895, -0.05);
+      const knee = new THREE.Group();
+      knee.position.y = -0.44;
+      leg.add(knee);
+      mesh(new THREE.CylinderGeometry(0.054, 0.042, 0.42, 12), matSkin, knee, 0, -0.21, 0);
+      const foot = mesh(new THREE.SphereGeometry(0.075, 12, 10), matSkin, knee, 0, -0.455, -0.05);
       foot.scale.set(0.85, 0.45, 1.5); // bare foot, sole lands ~0.02
-      return leg;
+      return { leg, knee };
     };
-    const legL = makeLeg(-1);
-    const legR = makeLeg(1);
+    const legLeft = makeLeg(-1);
+    const legRight = makeLeg(1);
 
     // ---- torso (waist pivot) ----
     const torso = new THREE.Group();
@@ -278,13 +291,28 @@ export class PlayerAvatar {
       hips, torso, head,
       armL: aL.arm, armR: aR.arm,
       forearmL: aL.fore, forearmR: aR.fore,
-      legL, legR,
+      legL: legLeft.leg, legR: legRight.leg,
+      kneeL: legLeft.knee, kneeR: legRight.knee,
       jubbaMesh, jubbaHem, lungiMesh, turbanTail, tailTip,
     };
+    this.skinMaterials = { jubba: matJubba, thalappav: matTurban, tail: tailMat, border: matLungiBorder, borderDark: matLungiBorderDark };
+  }
+
+  setSkin(skinId) {
+    const skin = getAvatarSkin(skinId);
+    const colors = skin.colors;
+    this.skinMaterials.jubba.color.setHex(colors.jubba);
+    this.skinMaterials.thalappav.color.setHex(colors.thalappav);
+    this.skinMaterials.tail.color.setHex(colors.thalappav);
+    this.skinMaterials.border.color.setHex(colors.border);
+    this.skinMaterials.borderDark.color.setHex(colors.borderDark);
+    this.skinId = skin.id;
+    return this.skinId;
   }
 
   // ------------------------------------------------------------------ anims
   setAnim(name) {
+    name = SERVER_ANIM_POSES[name] || name;
     if (!AVATAR_ANIMS.includes(name)) return;
     if (name === this.anim && this.animT > 0) {
       // re-trigger one-shots cleanly
@@ -308,6 +336,7 @@ export class PlayerAvatar {
     this._blendT = 1;
     this.anim = 'idle';
     this.animT = 0;
+    this._landingT = 0;
     this.runRate = 1;
     this.runPhase = 0;
   }
@@ -349,16 +378,21 @@ export class PlayerAvatar {
     const rate = Math.min(2.0, Math.max(0.25, this.runRate || 1));
     const sL = Math.sin(ph);
     const sR = Math.sin(ph + Math.PI);
-    p.legLx = sL * 0.75;
-    p.legRx = sR * 0.75;
-    p.armLx = sR * 0.62;
-    p.armRx = sL * 0.62;
+    // A little extra stride at speed, while keeping the one-piece jubba leg
+    // silhouette compact; the knee hinge prevents a long straight kick.
+    const stride = 0.58 + 0.08 * Math.min(1, Math.max(0, rate - 1));
+    p.legLx = sL * stride;
+    p.legRx = sR * stride;
+    p.kneeLx = -Math.max(0, sL) * 0.42;
+    p.kneeRx = -Math.max(0, sR) * 0.42;
+    p.armLx = sR * 0.76;
+    p.armRx = sL * 0.76;
     p.armLz = 0.14; p.armRz = -0.14;
     p.foreLx = 0.8 + 0.18 * sR; // forearm pump
     p.foreRx = 0.8 + 0.18 * sL;
-    p.hipsY = -0.05 * Math.abs(sL); // bob
+    p.hipsY = 0.025 * Math.sin(ph * 2) - 0.015; // small fixed-step body bob
     p.hipsRY = -0.10 * sL; // pelvic counter-rotation
-    p.torsoRX = -0.16 + 0.035 * Math.sin(ph * 2); // forward lean + bounce
+    p.torsoRX = -0.16 - 0.025 * Math.min(1, Math.max(0, rate - 1)) + 0.025 * Math.sin(ph * 2);
     p.torsoRY = 0.08 * sL; // shoulder counter-rotation
     p.headRX = 0.07;
     p.headRY = 0.06 * sL;
@@ -513,6 +547,8 @@ export class PlayerAvatar {
     P.forearmR.rotation.x = p.foreRx;
     P.legL.rotation.x = p.legLx;
     P.legR.rotation.x = p.legRx;
+    P.kneeL.rotation.x = p.kneeLx;
+    P.kneeR.rotation.x = p.kneeRx;
     this.group.rotation.z = p.leanZ;
     this.group.rotation.x = p.fallX;
     this.groupOffsetY = p.dropY;
@@ -528,7 +564,17 @@ export class PlayerAvatar {
     this._blendT += dt;
     const k = smooth01(this._blendT / 0.18);
     this._pose = lerpPose(this._prev, target, k);
+    if (this._landingT > 0) {
+      this._landingT = Math.max(0, this._landingT - dt);
+      const squash = Math.sin((this._landingT / 0.16) * Math.PI) * 0.08;
+      this._pose.hipsY -= squash * 0.35;
+      this._pose.torsoSY *= 1 - squash;
+    }
     this._apply();
+  }
+
+  triggerLanding() {
+    this._landingT = 0.16;
   }
 }
 

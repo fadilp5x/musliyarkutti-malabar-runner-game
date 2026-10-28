@@ -23,12 +23,25 @@ export class VoucherWalletUI {
     el.id = 'screen-wallet';
 
     const panel = document.createElement('div');
-    panel.className = 'panel';
+    panel.className = 'panel page-shell';
+
+    const header = document.createElement('header');
+    header.className = 'page-header';
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'btn-ghost page-back';
+    back.setAttribute('aria-label', 'Back');
+    back.textContent = '←';
+    back.addEventListener('click', () => {
+      this.game.audio?.play?.('click');
+      this.ui.show(this.ui.menus?.returnTo || 'hud');
+    });
 
     const title = document.createElement('h2');
     title.className = 'panel-title';
     title.textContent = 'Voucher Wallet';
-    panel.appendChild(title);
+    header.append(back, title, document.createElement('span'));
+    panel.appendChild(header);
 
     const banner = document.createElement('div');
     banner.className = 'demo-banner';
@@ -38,19 +51,6 @@ export class VoucherWalletUI {
     this.listEl = document.createElement('div');
     this.listEl.className = 'scroll-list';
     panel.appendChild(this.listEl);
-
-    const row = document.createElement('div');
-    row.className = 'btn-row';
-    const back = document.createElement('button');
-    back.type = 'button';
-    back.className = 'btn secondary small';
-    back.textContent = 'Back';
-    back.addEventListener('click', () => {
-      this.game.audio?.play?.('click');
-      this.ui.show(this.ui.menus?.returnTo || 'hud');
-    });
-    row.appendChild(back);
-    panel.appendChild(row);
 
     el.appendChild(panel);
     this.root = el;

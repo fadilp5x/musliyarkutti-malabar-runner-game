@@ -82,6 +82,7 @@ export class ShaytanPursuit {
     this._assetLoader = null;
     this._playerX = null; // optional () => player x
     this.reducedMotion = false;
+    this.rng = Math.random;
 
     // Shared procedural textures (per-instance; cheap, created once)
     this._smokeTex = radialTexture('rgba(200,200,210,0.55)', 'rgba(200,200,210,0)');
@@ -123,6 +124,8 @@ export class ShaytanPursuit {
     this._nextLunge = Infinity;
     this._spawnT = 0;
     this._nextRoar = Infinity;
+    this._pursueDistance = 0;
+    this._dormantDistance = 0;
     this._retreatFromZ = 0;
     this._puffT = -1;
 
@@ -136,6 +139,8 @@ export class ShaytanPursuit {
   setCamera(camera) {
     this._camera = camera;
   }
+
+  setRandomSource(rng = Math.random) { this.rng = rng; }
 
   setAssetLoader(loader) {
     this._assetLoader = loader;
@@ -451,7 +456,8 @@ export class ShaytanPursuit {
     this._t = 0;
     this._surgeT = 0;
     this._lunge = null;
-    this._nextLunge = this.reducedMotion ? Infinity : 2.5 + Math.random() * 2.5;
+    this._pursueDistance = 0;
+    this._nextLunge = this.reducedMotion ? Infinity : 25 + this.rng() * 25;
     this._spawnT = 0;
     this._vignT = -1;
     this._vignette.visible = false;
@@ -534,9 +540,9 @@ export class ShaytanPursuit {
 
   update(dt, playerZ, speed) {
     if (this._phase === 'idle') return;
-    if (this._phase === 'pursue') this._updatePursue(dt, playerZ);
+    if (this._phase === 'pursue') this._updatePursue(dt, playerZ, speed);
     else if (this._phase === 'retreat') this._updateRetreat(dt, playerZ);
-    else if (this._phase === 'dormant') this._updateDormant(dt);
+    else if (this._phase === 'dormant') this._updateDormant(dt, speed);
 
     // Warning vignette lifecycle (glued to the camera when active)
     if (this._vignT >= 0) {
@@ -606,8 +612,9 @@ export class ShaytanPursuit {
     return typeof this._playerX === 'function' ? this._playerX() : 0;
   }
 
-  _updatePursue(dt, playerZ) {
+  _updatePursue(dt, playerZ, speed = 10) {
     this._t += dt;
+    this._pursueDistance += speed * dt;
     const t = this._t;
     const rm = this.reducedMotion;
     const px = this._playerBaseX();
@@ -627,13 +634,13 @@ export class ShaytanPursuit {
         this._sfx('shaytan_chase_breath');
       } else if (L.phase === 'back' && L.t >= 0.9) {
         this._lunge = null;
-        this._nextLunge = t + 3 + Math.random() * 3;
+        this._nextLunge = this._pursueDistance + speed * (3 + this.rng() * 3);
       }
       if (this._lunge) {
         if (L.phase === 'dash') lungeZ = -1.8 * easeIn(clamp01(L.t / 0.45));
         else if (L.phase === 'back') lungeZ = -1.8 * (1 - clamp01(L.t / 0.9));
       }
-    } else if (t >= this._nextLunge && t < PURSUE_T - 1.6) {
+    } else if (this._pursueDistance >= this._nextLunge && t < PURSUE_T - 1.6) {
       this._lunge = { phase: 'warn', t: 0 };
       this._vignT = 0;
     }
@@ -831,15 +838,18 @@ export class ShaytanPursuit {
       this.group.visible = false;
       this._phase = 'dormant';
       this._t = 0;
-      this._nextRoar = 40 + Math.random() * 30;
+      this._dormantDistance = 0;
+      this._nextRoar = 400 + this.rng() * 300;
     }
   }
 
-  _updateDormant(dt) {
+  _updateDormant(dt, speed = 10) {
     this._t += dt;
-    if (this._t >= this._nextRoar) {
+    this._dormantDistance += speed * dt;
+    if (this._dormantDistance >= this._nextRoar) {
       this._t = 0;
-      this._nextRoar = 40 + Math.random() * 30;
+      this._dormantDistance = 0;
+      this._nextRoar = 400 + this.rng() * 300;
       this._sfx('shaytan_distant_roar');
       // Faint distant smoke puff — atmosphere only, far beyond the road.
       this._distantPuff.position.set((Math.random() - 0.5) * 10, 2.5, -38);

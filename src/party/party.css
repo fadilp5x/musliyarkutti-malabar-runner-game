@@ -70,7 +70,23 @@
 .party-board-name { overflow: hidden; color: var(--ivory); font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
 .party-board-stat { color: rgba(250, 247, 240, .75); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .party-board-state { grid-column: 1 / -1; color: rgba(250, 247, 240, .52); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.party-remote-edges { position: fixed; z-index: 22; top: max(78px, calc(env(safe-area-inset-top) + 70px)); left: 50%; display: grid; gap: 5px; transform: translateX(-50%); pointer-events: none; }
+.party-remote-edge { padding: 5px 9px; border: 1px solid rgba(255, 215, 0, .6); border-radius: 99px; background: rgba(10, 18, 39, .88); color: #fff3a6; font: 800 11px/1.2 system-ui, sans-serif; white-space: nowrap; }
+.party-crash-toast { position: fixed; z-index: 130; top: max(18px, env(safe-area-inset-top)); left: 50%; padding: 10px 15px; transform: translateX(-50%); border: 1px solid rgba(255, 215, 0, .62); border-radius: 13px; background: rgba(10, 18, 39, .94); color: #fff3a6; font: 800 13px/1.3 system-ui, sans-serif; box-shadow: 0 8px 25px rgba(0,0,0,.4); pointer-events: none; }
+.party-spectator-track { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; height: 190px; margin: 14px 0; }
+.party-spectator-lane { position: relative; overflow: hidden; border: 1px solid rgba(130, 177, 255, .28); border-radius: 12px; background: repeating-linear-gradient(180deg, rgba(250,250,250,.025) 0 23px, rgba(250,250,250,.09) 24px 25px), rgba(5,16,31,.55); }
+.party-spectator-lane > strong { position: absolute; top: 7px; left: 0; width: 100%; color: rgba(250,247,240,.62); font-size: 10px; text-align: center; text-transform: uppercase; }
+.party-spectator-dot { position: absolute; left: 50%; max-width: 94%; padding: 4px 6px; transform: translateX(-50%); border: 1px solid rgba(255,255,255,.45); border-radius: 99px; background: #36c5b0; color: #102031; font-size: 10px; font-weight: 850; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.party-spectator-dot.is-self { background: #ffd700; }
+.party-spectator-standings { display: grid; gap: 5px; max-height: 155px; overflow: auto; }
+.party-spectator-standing { padding: 7px 9px; border-radius: 9px; background: rgba(250,250,250,.07); font-size: 12px; }
+.party-spectator-standing.is-finished { color: rgba(250,247,240,.58); }
+.party-view[data-view="spectator"] { max-height: min(82vh, 700px); overflow-y: auto; }
 .party-results { display: grid; gap: 7px; margin: 16px 0 20px; }
+.party-next-banner { display: grid; gap: 8px; margin: 14px 0 6px; padding: 15px 16px; border: 2px solid rgba(255, 215, 0, .82); border-radius: 16px; background: linear-gradient(140deg, rgba(255, 215, 0, .17), rgba(4, 156, 216, .16)); box-shadow: inset 0 1px rgba(255,255,255,.1), 0 5px 0 rgba(7,12,28,.5); color: #fff; font-size: 14px; line-height: 1.45; }
+.party-next-banner strong { color: #fff3a6; font-size: 15px; }
+.party-next-banner span { color: rgba(250, 250, 250, .82); font-size: 12px; font-weight: 800; }
+.party-next-banner [data-auto-countdown] { color: #ffd700; font-size: 14px; }
 .party-result { display: flex; justify-content: space-between; gap: 10px; padding: 9px 10px; border-radius: 9px; background: rgba(250, 247, 240, .07); font-size: 13px; }
 .party-result strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .party-result span { flex: 0 0 auto; color: rgba(250, 247, 240, .75); font-variant-numeric: tabular-nums; }
@@ -79,6 +95,89 @@
   .party-board { top: max(70px, calc(env(safe-area-inset-top) + 60px)); right: 8px; width: min(185px, 43vw); padding: 5px; }
   .party-board-row { padding: 5px; font-size: 10px; }
   .party-actions { flex-direction: column; }
+}
+
+/* Shared token reskin for multiplayer entry, standings, chat and spectator UI. */
+.party-layer {
+  background: color-mix(in srgb, var(--color-ink) 36%, transparent);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  font-family: var(--font-ui);
+}
+.party-card {
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 2 * var(--space-4));
+  padding: clamp(var(--space-4), 4vw, var(--space-8));
+  border: 3px solid var(--color-ink);
+  border-radius: var(--radius-lg);
+  background: var(--color-white);
+  box-shadow: var(--shadow-card);
+  color: var(--color-ink);
+  font-family: var(--font-ui);
+}
+.party-kicker { color: var(--color-green-700); font-family: var(--font-ui); }
+.party-title { color: var(--color-ink); font-family: var(--font-ui); font-size: clamp(1.7rem, 7vw, 2.7rem); text-shadow: none; }
+.party-copy { color: var(--color-ink); font-family: var(--font-ui); }
+.party-fields { gap: var(--space-3); }
+.party-field { color: var(--color-ink); font-family: var(--font-ui); }
+.party-field input { min-height: 48px; border: 2px solid var(--color-ink); border-radius: var(--radius-md); color: var(--color-ink); background: var(--color-cloud); font-family: var(--font-ui); }
+.party-field input:focus { border-color: var(--color-sky-600); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-sky-400) 28%, transparent); }
+.party-actions { gap: var(--space-2); }
+.party-actions .btn { margin: 0; }
+.party-status { color: var(--color-ink); font-family: var(--font-ui); }
+.party-status.error { color: var(--color-coral-700); }
+.party-code { border: 2px dashed var(--color-gold-600); border-radius: var(--radius-md); color: var(--color-ink); background: color-mix(in srgb, var(--color-gold-400) 24%, var(--color-white)); text-shadow: none; }
+.party-player,
+.party-result { border: 2px solid color-mix(in srgb, var(--color-ink) 18%, transparent); border-radius: var(--radius-md); color: var(--color-ink); background: var(--color-cloud); }
+.party-player-meta,
+.party-result span,
+.party-board-stat,
+.party-board-state { color: var(--color-ink); }
+.party-player-name,
+.party-board-name { color: var(--color-ink); }
+.party-board { width: min(245px, 40vw); border: 2px solid var(--color-white); border-radius: var(--radius-md); color: var(--color-white); background: color-mix(in srgb, var(--color-ink) 88%, transparent); box-shadow: var(--shadow-card); }
+.party-board-row { border-color: color-mix(in srgb, var(--color-white) 26%, transparent); }
+.party-board-name,
+.party-board-stat,
+.party-board-state { color: var(--color-white); }
+.party-remote-edge,
+.party-crash-toast { border: 2px solid var(--color-white); border-radius: var(--radius-pill); color: var(--color-ink); background: var(--color-gold-400); font-family: var(--font-ui); }
+.party-crash-toast { box-shadow: var(--shadow-toast); }
+.party-spectator-lane { border: 2px solid var(--color-white); border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-ink) 78%, transparent); }
+.party-spectator-lane > strong { color: var(--color-white); font-family: var(--font-ui); }
+.party-spectator-dot { border: 2px solid var(--color-white); color: var(--color-ink); background: var(--color-green-500); font-family: var(--font-ui); }
+.party-spectator-dot.is-self { color: var(--color-ink); background: var(--color-gold-400); }
+.party-spectator-standing { border: 1px solid var(--color-ink); border-radius: var(--radius-md); color: var(--color-ink); background: var(--color-cloud); font-family: var(--font-ui); }
+.party-spectator-standing.is-finished { color: var(--color-ink); }
+.party-next-banner { border: 2px solid var(--color-gold-600); border-radius: var(--radius-md); color: var(--color-ink); background: color-mix(in srgb, var(--color-gold-400) 22%, var(--color-white)); box-shadow: none; font-family: var(--font-ui); }
+.party-next-banner strong,
+.party-next-banner span,
+.party-next-banner [data-auto-countdown] { color: var(--color-ink); font-family: var(--font-ui); }
+.party-leaderboard-row { border-radius: var(--radius-md); color: var(--color-ink); background: var(--color-cloud); }
+.party-leaderboard-row.is-self { border: 2px solid var(--color-gold-600); background: color-mix(in srgb, var(--color-gold-400) 20%, var(--color-white)); }
+.party-leaderboard-name,
+.party-leaderboard-score,
+.party-leaderboard-rank { color: var(--color-ink); }
+.party-leaderboard-empty,
+.party-leaderboard-status { color: var(--color-ink); }
+.party-leaderboard-tabs button { min-height: 48px; border: 2px solid var(--color-ink); border-radius: var(--radius-pill); color: var(--color-ink); background: var(--color-cloud); font: 600 0.95rem/1.2 var(--font-ui); }
+.party-leaderboard-tabs button.active { color: var(--color-ink); background: var(--color-gold-400); }
+.party-chat-toggle { min-height: 48px; border: 2px solid var(--color-white); border-radius: var(--radius-pill); color: var(--color-ink); background: var(--color-gold-400); box-shadow: var(--shadow-card); font-family: var(--font-ui); }
+.party-chat-badge { color: var(--color-ink); background: var(--color-white); }
+.party-chat-panel { border: 3px solid var(--color-ink); border-radius: var(--radius-lg); color: var(--color-ink); background: var(--color-white); box-shadow: var(--shadow-card); font-family: var(--font-ui); }
+.party-chat-header,
+.party-chat-message strong { color: var(--color-green-700); }
+.party-chat-close { min-width: 48px; min-height: 48px; border-radius: var(--radius-pill); color: var(--color-ink); background: var(--color-cloud); }
+.party-chat-message { border: 1px solid var(--color-ink); border-radius: var(--radius-md); color: var(--color-ink); background: color-mix(in srgb, var(--color-sky-400) 18%, var(--color-white)); }
+.party-chat-message.is-self { background: color-mix(in srgb, var(--color-green-500) 18%, var(--color-white)); }
+.party-chat-phrases button { min-height: 48px; border: 2px solid var(--color-green-700); border-radius: var(--radius-pill); color: var(--color-ink); background: var(--color-cloud); font: 600 0.9rem/1.2 var(--font-ui); }
+.party-chat-form input { min-height: 48px; border: 2px solid var(--color-ink); border-radius: var(--radius-md); color: var(--color-ink); background: var(--color-cloud); font: 1rem/1.2 var(--font-ui); }
+.party-trigger { color: var(--color-ink); background: var(--color-sky-400); box-shadow: var(--shadow-secondary); }
+
+@media (max-width: 560px) {
+  .party-actions { flex-direction: column; }
+  .party-board { width: min(190px, 44vw); }
+  .party-chat-panel { width: min(340px, calc(100vw - 24px)); }
 }
 
 /* Room screens follow the bright primary palette while keeping the game’s
@@ -143,3 +242,133 @@
 .party-board-state { color: #69f0ae; }
 .party-status { color: rgba(250, 250, 250, 0.78); }
 .party-status.error { color: #ff8f9d; }
+
+.party-chat {
+  position: fixed;
+  z-index: 24;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  pointer-events: none;
+}
+.party-chat.hidden { display: none !important; }
+.party-chat-toggle {
+  min-height: 42px;
+  padding: 8px 13px;
+  border: 2px solid rgba(255, 215, 0, .72);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #e52521, #9b0000);
+  box-shadow: 0 4px 0 #70000a, 0 8px 18px rgba(0, 0, 0, .3);
+  color: #fff3a6;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 850;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+.party-chat-badge {
+  display: inline-grid;
+  min-width: 19px;
+  height: 19px;
+  margin-left: 5px;
+  padding: 0 4px;
+  place-items: center;
+  border-radius: 99px;
+  background: #ffd700;
+  color: #17213e;
+  font-size: 11px;
+}
+.party-chat-panel {
+  display: grid;
+  grid-template-rows: auto minmax(90px, 220px) auto auto;
+  gap: 8px;
+  width: min(340px, calc(100vw - 28px));
+  padding: 12px;
+  border: 2px solid rgba(255, 215, 0, .58);
+  border-radius: 18px;
+  background: linear-gradient(155deg, #223052, #16213e 74%);
+  box-shadow: 0 8px 0 rgba(7, 12, 28, .8), 0 18px 48px rgba(0, 0, 0, .45);
+  color: #fff;
+  pointer-events: auto;
+  touch-action: pan-y;
+}
+.party-chat-panel.hidden { display: none !important; }
+.party-chat-header { display: flex; justify-content: space-between; align-items: center; color: #ffd700; }
+.party-chat-close { border: 0; background: transparent; color: #fff; font-size: 24px; line-height: 1; }
+.party-chat-messages { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; overscroll-behavior: contain; }
+.party-chat-message { display: grid; gap: 2px; max-width: 92%; padding: 7px 9px; border-radius: 10px; background: rgba(130, 177, 255, .14); overflow-wrap: anywhere; font-size: 12px; }
+.party-chat-message strong { color: #ffd700; font-size: 10px; }
+.party-chat-message.is-self { align-self: end; background: rgba(67, 176, 71, .2); }
+.party-chat-phrases { display: flex; gap: 6px; }
+.party-chat-phrases button { flex: 1; padding: 6px; border: 1px solid rgba(255, 215, 0, .38); border-radius: 9px; background: rgba(255, 215, 0, .1); color: #fff3a6; font: inherit; font-size: 11px; font-weight: 800; touch-action: manipulation; }
+.party-chat-form { display: flex; gap: 7px; }
+.party-chat-form input { min-width: 0; flex: 1; padding: 9px; border: 1px solid rgba(130, 177, 255, .4); border-radius: 10px; outline: none; background: rgba(22, 33, 62, .9); color: #fff; font: inherit; font-size: 16px; touch-action: manipulation; }
+.party-chat-form .btn { flex: 0 0 auto; min-height: 40px; padding: 7px 11px; }
+.party-chat.is-racing .party-chat-panel { max-height: min(46vh, 380px); grid-template-rows: auto minmax(70px, 1fr) auto auto; }
+
+.party-leaderboard { z-index: 124; }
+.party-leaderboard .party-card { display: grid; gap: 12px; }
+.party-leaderboard-tabs { display: flex; gap: 8px; }
+.party-leaderboard-tabs button { flex: 1; min-height: 40px; border: 1px solid rgba(255, 215, 0, .42); border-radius: 11px; background: rgba(255, 215, 0, .08); color: #fff3a6; font: inherit; font-weight: 850; }
+.party-leaderboard-tabs button.active { background: #ffd700; color: #17213e; box-shadow: 0 3px 0 #9b7410; }
+.party-leaderboard-status { min-height: 18px; color: rgba(250, 250, 250, .72); font-size: 12px; }
+.party-leaderboard-list { display: grid; gap: 6px; max-height: min(54vh, 470px); overflow-y: auto; }
+.party-leaderboard-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 9px; border: 1px solid rgba(130, 177, 255, .18); border-radius: 11px; background: rgba(250, 250, 250, .06); font-size: 12px; }
+.party-leaderboard-row.is-self { border-color: #ffd700; background: rgba(255, 215, 0, .16); box-shadow: inset 3px 0 #ffd700; }
+.party-leaderboard-rank { color: #ffd700; font-variant-numeric: tabular-nums; }
+.party-leaderboard-name { overflow: hidden; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.party-leaderboard-score { color: #fff3a6; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.party-leaderboard-empty { margin: 0; padding: 24px 12px; border-radius: 12px; background: rgba(250, 250, 250, .06); color: rgba(250, 250, 250, .76); font-size: 13px; text-align: center; }
+
+@media (max-width: 560px) {
+  .party-chat { right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); }
+  .party-chat-panel { grid-template-rows: auto minmax(70px, 170px) auto auto; }
+  .party-leaderboard-row { grid-template-columns: 30px minmax(0, 1fr); }
+  .party-leaderboard-score { grid-column: 2; }
+}
+
+/* Final shared-token overrides for the existing multiplayer UI. */
+.party-layer { background: color-mix(in srgb, var(--color-ink) 36%, transparent); backdrop-filter: blur(2px); font-family: var(--font-ui); }
+.party-card { max-height: calc(100dvh - 2 * var(--space-4)); padding: clamp(var(--space-4), 4vw, var(--space-8)); border: 3px solid var(--color-ink); border-radius: var(--radius-lg); background: var(--color-white); box-shadow: var(--shadow-card); color: var(--color-ink); font-family: var(--font-ui); }
+.party-kicker { color: var(--color-green-700); }
+.party-title { color: var(--color-ink); font-family: var(--font-ui); text-shadow: none; }
+.party-copy, .party-field, .party-status { color: var(--color-ink); font-family: var(--font-ui); }
+.party-status.error { color: var(--color-coral-700); }
+.party-field input, .party-chat-form input { min-height: 48px; border: 2px solid var(--color-ink); border-radius: var(--radius-md); color: var(--color-ink); background: var(--color-cloud); font-family: var(--font-ui); }
+.party-field input:focus { border-color: var(--color-sky-600); }
+.party-code { border: 2px dashed var(--color-gold-600); border-radius: var(--radius-md); color: var(--color-ink); background: color-mix(in srgb, var(--color-gold-400) 24%, var(--color-white)); text-shadow: none; }
+.party-player, .party-result, .party-spectator-standing { border: 2px solid color-mix(in srgb, var(--color-ink) 18%, transparent); border-radius: var(--radius-md); color: var(--color-ink); background: var(--color-cloud); }
+.party-player-meta, .party-result span { color: var(--color-ink); }
+.party-board-name, .party-board-stat, .party-board-state { color: var(--color-white); }
+.party-board { width: min(245px, 40vw); border: 2px solid var(--color-white); border-radius: var(--radius-md); color: var(--color-white); background: color-mix(in srgb, var(--color-ink) 88%, transparent); box-shadow: var(--shadow-card); }
+.party-board-row { border-color: color-mix(in srgb, var(--color-white) 26%, transparent); }
+.party-remote-edge, .party-crash-toast { border: 2px solid var(--color-white); border-radius: var(--radius-pill); color: var(--color-ink); background: var(--color-gold-400); font-family: var(--font-ui); }
+.party-crash-toast { box-shadow: var(--shadow-toast); }
+.party-spectator-lane { border: 2px solid var(--color-white); border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-ink) 78%, transparent); }
+.party-spectator-lane > strong { color: var(--color-white); font-family: var(--font-ui); }
+.party-spectator-dot { border: 2px solid var(--color-white); color: var(--color-ink); background: var(--color-green-500); font-family: var(--font-ui); }
+.party-spectator-dot.is-self { color: var(--color-ink); background: var(--color-gold-400); }
+.party-next-banner { border: 2px solid var(--color-gold-600); border-radius: var(--radius-md); color: var(--color-ink); background: color-mix(in srgb, var(--color-gold-400) 22%, var(--color-white)); box-shadow: none; font-family: var(--font-ui); }
+.party-next-banner strong, .party-next-banner span, .party-next-banner [data-auto-countdown] { color: var(--color-ink); }
+.party-leaderboard-row { border-radius: var(--radius-md); color: var(--color-ink); background: var(--color-cloud); }
+.party-leaderboard-row.is-self { border: 2px solid var(--color-gold-600); background: color-mix(in srgb, var(--color-gold-400) 20%, var(--color-white)); }
+.party-leaderboard-name, .party-leaderboard-score, .party-leaderboard-rank, .party-leaderboard-status, .party-leaderboard-empty { color: var(--color-ink); }
+.party-leaderboard-tabs button, .party-chat-phrases button { min-height: 48px; border: 2px solid var(--color-ink); border-radius: var(--radius-pill); color: var(--color-ink); background: var(--color-cloud); font: 600 0.95rem/1.2 var(--font-ui); }
+.party-leaderboard-tabs button.active { color: var(--color-ink); background: var(--color-gold-400); box-shadow: none; }
+.party-chat-toggle { min-height: 48px; border: 2px solid var(--color-white); border-radius: var(--radius-pill); color: var(--color-ink); background: var(--color-gold-400); box-shadow: var(--shadow-card); font-family: var(--font-ui); }
+.party-chat-badge { color: var(--color-ink); background: var(--color-white); }
+.party-chat-panel { border: 3px solid var(--color-ink); border-radius: var(--radius-lg); color: var(--color-ink); background: var(--color-white); box-shadow: var(--shadow-card); font-family: var(--font-ui); }
+.party-chat-header, .party-chat-message strong { color: var(--color-green-700); }
+.party-chat-close { min-width: 48px; min-height: 48px; border-radius: var(--radius-pill); color: var(--color-ink); background: var(--color-cloud); }
+.party-chat-message { border: 1px solid var(--color-ink); border-radius: var(--radius-md); color: var(--color-ink); background: color-mix(in srgb, var(--color-sky-400) 18%, var(--color-white)); }
+.party-chat-message.is-self { background: color-mix(in srgb, var(--color-green-500) 18%, var(--color-white)); }
+.party-chat-form input { font: 1rem/1.2 var(--font-ui); }
+.party-chat-form .btn { min-height: 48px; }
+.party-trigger { color: var(--color-ink); background: var(--color-sky-400); box-shadow: var(--shadow-secondary); }
+
+@media (max-width: 560px) {
+  .party-actions { flex-direction: column; }
+  .party-board { width: min(190px, 44vw); }
+}

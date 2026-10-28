@@ -16,10 +16,10 @@ npm install     # once — installs three, vite, vitest locally
 npm run dev     # play in dev at http://localhost:5173
 npm run build   # production build into dist/
 npm run preview # serve the production build at http://localhost:4173
-npm test        # run the Vitest suite (76 tests)
+npm test        # run the Vitest suite
 ```
 
-No accounts, no servers, no build-time network calls. SVG assets ship in `public/svg/`.
+Solo play runs locally with Vite. Multiplayer uses a Netlify Function and Netlify Blobs; use the Netlify CLI for local multiplayer. SVG assets ship in `public/svg/`.
 
 ## Intro, subtitles & audio
 
@@ -97,12 +97,22 @@ missions, inventory) with validation and a reset option in Settings.
 
 - Treadmill runner: the player stays near z=0 while the world streams toward +Z.
 - Fixed-timestep simulation (120 Hz accumulator) with per-frame rendering.
-- Procedural Web Audio SFX (no audio files); mute in Settings.
+- Web Audio sound effects plus bundled narration, recitation, and background music in `public/audio/`; mute in Settings.
 - Quality toggle (High/Low) for mobile; reduced-motion support.
 - Contract details: see `CONTRACTS.md`. Honest status: see `FEATURE_CHECKLIST.md`.
 
-## Multiplayer race (local preview)
+## Multiplayer
 
-The multiplayer race uses the original version 2 runner scene. Choose **Multiplayer** on the title screen to create a room, then share its six-character code. Friends join from their own devices; the host starts the shared countdown. Rooms support 2–8 runners, with live distance and coin standings. The longest run wins, with coins as the tie-breaker.
+### Play online
 
-Start the local server with `npm run dev -- --host 0.0.0.0 --port 5174` and open `http://localhost:5174/`. Devices on the same Wi-Fi can use this computer's network address with port `5174` (for example, `http://192.168.1.42:5174/`).
+1. Open [malabarrunner.netlify.app](https://malabarrunner.netlify.app/) and choose **Multiplayer** on the title screen.
+2. One player creates a room; everyone else joins from their own device using its six-character code.
+3. The host starts the three-round race. Total distance wins; coins break ties.
+
+### Run multiplayer locally
+
+From the project directory, run `npx netlify dev` and open `http://localhost:8888/`. This runs Vite together with the Netlify Function and Blobs development context. `npm run dev` starts Vite only; Vite does not serve `/.netlify/functions/game`, so multiplayer will not work through Vite alone.
+
+### Multiplayer tech stack
+
+Vite + Three.js client; `/.netlify/functions/game` as a TypeScript Netlify Function; JavaScript room logic in `server/gameRoomService.js`; Netlify Blobs with strong consistency and conditional writes.

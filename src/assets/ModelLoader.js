@@ -93,6 +93,11 @@ export class ModelLoader {
     } catch { /* older three without meshopt — non-compressed GLBs still load */ }
     this._handles = new Map(); // slotName -> SlotHandle
     this._clipCache = new Map(); // clip file url -> loaded gltf (per-clip GLBs)
+    this.onAssetSettled = null;
+  }
+
+  setAssetProgressListener(listener) {
+    this.onAssetSettled = typeof listener === 'function' ? listener : null;
   }
 
   _resolve(path) {
@@ -138,17 +143,21 @@ export class ModelLoader {
     if (this._handles.has(slotName)) return this._handles.get(slotName);
     const entry = this._slotEntry(slotName);
 
-    let handle;
-    if (!isSlotMissing(entry)) {
-      const url = this._resolve(entry.file);
-      const gltf = await this._gltfLoader.loadAsync(url); // throws on failure: honest
-      handle = this._makeGlbHandle(slotName, entry, gltf);
-    } else {
-      handle = this._makeFallbackHandle(slotName, entry);
+    try {
+      let handle;
+      if (!isSlotMissing(entry)) {
+        const url = this._resolve(entry.file);
+        const gltf = await this._gltfLoader.loadAsync(url); // throws on failure: honest
+        handle = this._makeGlbHandle(slotName, entry, gltf);
+      } else {
+        handle = this._makeFallbackHandle(slotName, entry);
+      }
+      if (rotationY) handle.object3D.rotation.y += rotationY;
+      this._handles.set(slotName, handle);
+      return handle;
+    } finally {
+      this.onAssetSettled?.(slotName);
     }
-    if (rotationY) handle.object3D.rotation.y += rotationY;
-    this._handles.set(slotName, handle);
-    return handle;
   }
 
   _makeGlbHandle(slotName, entry, gltf) {

@@ -300,22 +300,36 @@ export class EffectsManager {
     });
     // Coin sparkle — gold, ADDITIVE, at the player (coins collect within
     // ~1 m of the hero). A hot white-gold core flash sells the pickup.
-    events.on('coin', () => {
-      const n = this.reducedMotion ? 2 : 4;
+    events.on('coin', (value = 1) => {
+      const n = this.reducedMotion ? 2 : (value >= 10 ? 8 : 4);
       for (let i = 0; i < n; i++) {
         const a = Math.random() * Math.PI * 2;
         this._spark.spawn(this._px + Math.cos(a) * 0.25, 1.1 + Math.sin(a) * 0.25, 0, {
-          life: 0.42, vx: Math.cos(a) * 1.6, vy: 1.2 + Math.sin(a) * 1.2,
-          sx: 0.32, growX: -0.25, growY: -0.25, spin: (Math.random() - 0.5) * 6,
+          life: 0.42, vx: Math.cos(a) * (value >= 10 ? 2.2 : 1.6), vy: 1.2 + Math.sin(a) * 1.2,
+          sx: value >= 10 ? 0.46 : 0.32, growX: -0.25, growY: -0.25, spin: (Math.random() - 0.5) * 6,
           opacity: 0.9, fadePow: 1.2,
         });
       }
       if (!this.reducedMotion) {
         this._spark.spawn(this._px, 1.15, 0, {
-          life: 0.24, sx: 0.5, growX: 2.2, growY: 2.2,
+          life: value >= 10 ? 0.34 : 0.24,
+          sx: value >= 10 ? 0.82 : 0.5,
+          growX: value >= 10 ? 3.4 : 2.2,
+          growY: value >= 10 ? 3.4 : 2.2,
           opacity: 1.0, fadePow: 1.8,
         });
       }
+    });
+    events.on('milestone', () => {
+      const n = this.reducedMotion ? 4 : 12;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        this._spark.spawn(this._px + Math.cos(a) * 0.25, 1.15 + Math.sin(a) * 0.3, 0, {
+          life: 0.7, vx: Math.cos(a) * 2.6, vy: 1.1 + Math.abs(Math.sin(a)) * 2, vz: 0.2,
+          sx: 0.34, growX: -0.2, growY: -0.2, opacity: 1, fadePow: 1.2,
+        });
+      }
+      if (!this.reducedMotion) this._spark.spawn(this._px, 1.2, 0, { life: 0.3, sx: 0.7, growX: 3, growY: 3, opacity: 1, fadePow: 2 });
     });
     // Near-miss streak — quick side whoosh, additive so it flashes.
     events.on('nearmiss', () => {

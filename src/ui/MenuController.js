@@ -1,5 +1,5 @@
 // MenuController.js — builds all menu screens: loading, tap, pause, gameover,
-// settings, missions, inventory. DOM only, no three.js.
+// settings, goals, wardrobe, missions, inventory. DOM only, no three.js.
 
 const DEFAULT_SETTINGS = {
   sound: true,
@@ -53,12 +53,33 @@ export class MenuController {
     return b;
   }
 
-  makeScreen(name) {
+  makeScreen(name, pageTitle) {
     const el = document.createElement('div');
     el.className = 'screen hidden';
     el.id = 'screen-' + name;
     const panel = document.createElement('div');
-    panel.className = 'panel';
+    panel.className = 'panel page-shell';
+    if (name !== 'loading') {
+      const header = document.createElement('header');
+      header.className = 'page-header';
+      const back = document.createElement('button');
+      back.type = 'button';
+      back.className = 'btn-ghost page-back';
+      back.setAttribute('aria-label', 'Back');
+      back.textContent = '←';
+      back.addEventListener('click', this.click(() => {
+        if (name === 'pause') {
+          try { this.game.togglePause?.(); } catch { /* noop */ }
+        } else {
+          this.ui.show(this.returnTo || 'tap');
+        }
+      }));
+      const title = document.createElement('h2');
+      title.className = 'panel-title';
+      title.textContent = pageTitle || (name === 'inventory' ? 'Glide Boards' : name[0].toUpperCase() + name.slice(1));
+      header.append(back, title, document.createElement('span'));
+      panel.appendChild(header);
+    }
     el.appendChild(panel);
     this.ui.registerScreen(name, el);
     return { el, panel };
@@ -82,47 +103,161 @@ export class MenuController {
       else this.game.world?.setQuality?.(s.quality === 'low' ? 'low' : 'high');
     } catch { /* noop */ }
     try { document.getElementById('ui')?.classList.toggle('reduced-motion', !!s.reducedMotion); } catch { /* noop */ }
+    this.game.ui?.particles?.setReducedMotion?.(s.reducedMotion);
   }
 
   // ---------------------------------------------------------------- loading
   _buildLoading() {
-    const { panel } = this.makeScreen('loading');
-    panel.classList.add('thakarppan-loading');
+    const { el, panel } = this.makeScreen('loading');
+    panel.remove(); // the full-screen splash has no constrained generic card
+    el.classList.add('thakarppan-loading', 'loading-screen');
 
-    const title = document.createElement('div');
-    title.className = 'thakarppan-title';
-    title.innerHTML = 'MUSLIYARKUTTI<br><span class="accent">MALABAR RUNNER</span>';
-    panel.appendChild(title);
+    const particles = document.createElement('div');
+    particles.className = 'loading-particles';
+    particles.setAttribute('aria-hidden', 'true');
+
+    const splash = document.createElement('div');
+    splash.className = 'loading-splash';
+    splash.setAttribute('aria-hidden', 'true');
+    splash.textContent = 'Made with love for the Muslim scholar and student communities of Kerala, Malaysia and across South and Southeast Asia.';
+
+    const content = document.createElement('div');
+    content.className = 'loading-content';
+
+    const title = document.createElement('h1');
+    title.className = 'loading-title';
+    title.innerHTML = 'MUSLIYARKUTTI /<br>MALABAR RUNNER';
 
     const flair = document.createElement('div');
-    flair.className = 'thakarppan-flair';
-    flair.textContent = 'THAKARPPAN LOADING';
-    panel.appendChild(flair);
+    flair.className = 'loading-flair';
+    flair.textContent = 'GETTING THE ROAD READY';
 
     const barWrap = document.createElement('div');
     barWrap.className = 'load-bar-wrap';
+    barWrap.setAttribute('role', 'progressbar');
+    barWrap.setAttribute('aria-label', 'Loading game assets');
+    barWrap.setAttribute('aria-valuemin', '0');
+    barWrap.setAttribute('aria-valuemax', '100');
+    barWrap.setAttribute('aria-valuenow', '0');
     const barFill = document.createElement('div');
     barFill.className = 'load-bar-fill';
     barWrap.appendChild(barFill);
-    panel.appendChild(barWrap);
     this.loadBarFill = barFill;
 
     this.loadPct = document.createElement('div');
     this.loadPct.className = 'load-pct';
     this.loadPct.textContent = '0%';
-    panel.appendChild(this.loadPct);
 
     this.loadText = document.createElement('div');
     this.loadText.className = 'load-text';
     this.loadText.textContent = 'Starting...';
-    panel.appendChild(this.loadText);
+
+    const tip = document.createElement('p');
+    tip.className = 'loading-tip';
+    tip.setAttribute('aria-live', 'polite');
+    const tips = ['Slide under overhead gates', 'Collect gold letters', 'Race friends with a room code'];
+    let tipIndex = 0;
+    tip.textContent = tips[tipIndex];
+
+    content.append(title, flair, barWrap, this.loadPct, this.loadText, tip);
+
+    const owner = document.createElement('div');
+    owner.className = 'loading-owner';
+    owner.textContent = 'Fadil Muhammed P. · Built in Kerala';
+
+    const productCredit = document.createElement('div');
+    productCredit.className = 'loading-product-credit';
+    productCredit.textContent = 'Multiplayer built with ChatGPT';
+
+    const start = document.createElement('button');
+    start.type = 'button';
+    start.className = 'btn btn-primary loading-start hidden';
+    start.textContent = 'TAP TO START';
+    start.addEventListener('click', (event) => {
+      event.stopPropagation();
+      try { this.game.audio?._unlock?.(); } catch { /* browser may deny audio */ }
+      try { sessionStorage.setItem('mmr.loadingSeen', '1'); } catch { /* storage may be disabled */ }
+      this._loadingStartDismissed = true;
+      this.ui.show('tap');
+    });
+
+    el.append(particles, splash, content, owner, productCredit, start);
+    this.loadingScreen = el;
+    this.loadBarWrap = barWrap;
+    this.loadingStartButton = start;
+    this._loadingTips = tips;
+    this._loadingStartedAt = performance.now();
+    this._loadingMinMs = 0;
+    this._loadingReady = false;
+    this._loadingStartDismissed = false;
+    this._loadingRaw = 0;
+    this._loadingShown = 0;
+    this._loadingFrame = 0;
+    try {
+      this._loadingMinMs = sessionStorage.getItem('mmr.loadingSeen') === '1' ? 0 : 3000;
+      sessionStorage.setItem('mmr.loadingSeen', '1');
+    } catch {
+      this._loadingMinMs = 3000;
+    }
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ||
+      this._settings().reducedMotion;
+    if (!reduceMotion) {
+      this.loadingTipTimer = window.setInterval(() => {
+        tipIndex = (tipIndex + 1) % tips.length;
+        tip.textContent = tips[tipIndex];
+      }, 2600);
+    }
+    if (this._loadingMinMs === 0 || new URLSearchParams(window.location.search).get('loading-preview') === '1') {
+      el.classList.add('progress-ready');
+    } else {
+      this.loadingRevealTimer = window.setTimeout(() => {
+        el.classList.add('progress-ready');
+      }, 1200);
+    }
   }
 
   setLoadingProgress(pct, text) {
-    const p = Math.max(0, Math.min(100, Math.round(pct || 0)));
-    if (this.loadBarFill) this.loadBarFill.style.width = p + '%';
-    if (this.loadPct) this.loadPct.textContent = p + '%';
+    const p = Math.max(this._loadingRaw || 0, Math.max(0, Math.min(100, Number(pct) || 0)));
+    this._loadingRaw = p;
     if (this.loadText && text !== undefined) this.loadText.textContent = text;
+    this._easeLoadingProgress();
+    this._maybeShowLoadingStart();
+  }
+
+  _easeLoadingProgress() {
+    if (this._loadingFrame || !this.loadBarFill) return;
+    const tick = () => {
+      this._loadingFrame = 0;
+      const gap = this._loadingRaw - this._loadingShown;
+      this._loadingShown = gap < 0.35 ? this._loadingRaw : this._loadingShown + gap * 0.18;
+      const shown = Math.floor(this._loadingShown);
+      this.loadBarFill.style.width = this._loadingShown.toFixed(2) + '%';
+      this.loadBarWrap?.setAttribute('aria-valuenow', String(shown));
+      if (this.loadPct) this.loadPct.textContent = shown + '%';
+      if (this._loadingShown < this._loadingRaw) this._loadingFrame = requestAnimationFrame(tick);
+      this._maybeShowLoadingStart();
+    };
+    this._loadingFrame = requestAnimationFrame(tick);
+  }
+
+  markLoadingComplete() {
+    this._loadingReady = true;
+    this._maybeShowLoadingStart();
+  }
+
+  _maybeShowLoadingStart() {
+    if (!this._loadingReady || this._loadingShown < 99.95 || !this.loadingStartButton) return;
+    const remaining = this._loadingMinMs - (performance.now() - this._loadingStartedAt);
+    if (remaining > 0) {
+      if (!this.loadingMinTimer) {
+        this.loadingMinTimer = window.setTimeout(() => {
+          this.loadingMinTimer = null;
+          this._maybeShowLoadingStart();
+        }, remaining);
+      }
+      return;
+    }
+    this.loadingStartButton.classList.remove('hidden');
   }
 
   // ---------------------------------------------------------------- tap
@@ -142,31 +277,19 @@ export class MenuController {
     title.innerHTML = 'MUSLIYARKUTTI<br><span class="accent">MALABAR RUNNER</span>';
     el.appendChild(title);
 
-    const rule = document.createElement('div');
-    rule.className = 'title-rule';
-    rule.setAttribute('aria-hidden', 'true');
-    el.appendChild(rule);
-
-    const sub = document.createElement('p');
-    sub.className = 'subtitle';
-    sub.textContent = 'Kuttikkattur \u00B7 Kozhikode';
-    el.appendChild(sub);
-
     this.tapStats = document.createElement('div');
-    this.tapStats.className = 'best-stats';
+    this.tapStats.className = 'title-stats-pill';
     el.appendChild(this.tapStats);
 
-    const hint = document.createElement('div');
-    hint.className = 'tap-hint';
-    hint.textContent = 'TAP ANYWHERE TO BEGIN';
-    el.appendChild(hint);
-
-    const controls = document.createElement('div');
-    controls.className = 'controls-hint';
-    controls.innerHTML =
-      '\u2190 \u2192 / A D \u2014 switch lane &nbsp;\u00B7&nbsp; \u2191 / Space \u2014 jump<br>' +
-      '\u2193 / S \u2014 slide &nbsp;\u00B7&nbsp; Esc \u2014 pause &nbsp;\u00B7&nbsp; swipe on mobile';
-    el.appendChild(controls);
+    const mainActions = document.createElement('div');
+    mainActions.className = 'title-main-actions';
+    const playButton = document.createElement('button');
+    playButton.type = 'button';
+    playButton.className = 'btn btn-primary title-play';
+    playButton.textContent = 'PLAY';
+    playButton.setAttribute('aria-label', 'Play');
+    mainActions.appendChild(playButton);
+    el.appendChild(mainActions);
 
     const corner = document.createElement('div');
     corner.className = 'corner-links';
@@ -183,7 +306,8 @@ export class MenuController {
       });
       corner.appendChild(b);
     };
-    mk('Missions', 'missions');
+    mk('Goals', 'goals');
+    mk('Wardrobe', 'wardrobe');
     mk('Settings', 'settings');
     mk('Credits', 'credits');
     el.appendChild(corner);
@@ -202,102 +326,58 @@ export class MenuController {
     if (!this.tapStats) return;
     let d = {};
     try { d = this.game.save?.load?.() || {}; } catch { d = {}; }
-    this.tapStats.innerHTML = '';
-    const cells = [
-      ['Best score', Math.floor(d.highscore || 0)],
-      ['Best distance', Math.floor(d.bestDistance || 0) + ' m'],
-      ['Coins', Math.floor(d.coins || 0)],
-    ];
-    for (const [label, value] of cells) {
-      const cell = document.createElement('div');
-      cell.className = 'bstat';
-      const l = document.createElement('span');
-      l.className = 'label';
-      l.textContent = label;
-      const v = document.createElement('span');
-      v.className = 'value';
-      v.textContent = String(value);
-      cell.appendChild(l);
-      cell.appendChild(v);
-      this.tapStats.appendChild(cell);
-    }
-    // Skip Intro (Oct 14, 2026): shown only after the player has seen the
-    // cinematic once. Jumps straight to the runner.
-    if (this.skipIntroBtn) this.skipIntroBtn.remove();
-    this.skipIntroBtn = null;
-    if (d.hasSeenIntro) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'btn secondary small skip-intro-btn';
-      btn.textContent = 'Skip Intro →';
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        try { this.game.audio?.play?.('click'); } catch {}
-        try { this.game.skipIntro?.(); } catch {}
-      });
-      // Insert after the tap hint
-      const hint = this.tapEl?.querySelector('.tap-hint');
-      if (hint && hint.parentNode) {
-        hint.parentNode.insertBefore(btn, hint.nextSibling);
-      }
-      this.skipIntroBtn = btn;
-    }
+    this.tapStats.replaceChildren();
+    const best = document.createElement('span');
+    best.textContent = `Best ${Math.floor(d.highscore || 0)}`;
+    const distance = document.createElement('span');
+    distance.textContent = `${Math.floor(d.bestDistance || 0)} m`;
+    const coins = document.createElement('span');
+    coins.className = 'title-coins';
+    const coin = document.createElement('span');
+    coin.className = 'coin-icon';
+    coin.setAttribute('aria-hidden', 'true');
+    coin.textContent = '\u0639';
+    coins.append(coin, document.createTextNode(` ${Math.floor(d.coins || 0)} coins`));
+    this.tapStats.append(best, distance, coins);
   }
 
   // ---------------------------------------------------------------- credits
   _buildCredits() {
-    const { panel } = this.makeScreen('credits');
+    const { panel } = this.makeScreen('credits', 'Credits');
     panel.classList.add('credits-panel');
 
-    const kicker = document.createElement('div');
-    kicker.className = 'credits-kicker';
-    kicker.textContent = 'DEVELOPER';
-    panel.appendChild(kicker);
+    const addCredit = (heading, copy) => {
+      const section = document.createElement('section');
+      section.className = 'credits-section';
+      const title = document.createElement('h3');
+      title.textContent = heading;
+      const text = document.createElement('p');
+      text.textContent = copy;
+      section.append(title, text);
+      panel.appendChild(section);
+    };
+    addCredit('Made by', 'Fadil Muhammed P. · Built in Kerala · fadilp5x');
+    addCredit('Built with', 'Three.js · Vite · Multiplayer built with ChatGPT');
+    addCredit('Audio and assets', 'Music made with Google Lyria · Voice made with ElevenLabs (free plan)');
 
-    // Each letter gets its own span for the staggered wave-in animation.
-    // The rainbow cycling is done via CSS hue-rotate on the whole name.
-    const name = document.createElement('div');
-    name.className = 'credits-name';
-    const handle = 'fadilp5x';
-    for (let i = 0; i < handle.length; i++) {
-      const ch = document.createElement('span');
-      ch.className = 'credits-letter';
-      ch.style.animationDelay = (i * 0.08) + 's';
-      ch.textContent = handle[i];
-      name.appendChild(ch);
-    }
-    panel.appendChild(name);
+    const dedication = document.createElement('p');
+    dedication.className = 'credits-dedication';
+    dedication.textContent = 'Made with love for the Muslim scholar and student communities of Kerala, Malaysia and across South and Southeast Asia.';
+    panel.appendChild(dedication);
 
-    const gh = document.createElement('a');
-    gh.className = 'credits-github';
-    gh.href = 'https://github.com/fadilp5x';
-    gh.target = '_blank';
-    gh.rel = 'noopener';
-    gh.textContent = 'github.com/fadilp5x';
-    // Don't let the link tap start the game (credits is reached from title).
-    gh.addEventListener('click', (e) => e.stopPropagation());
-    panel.appendChild(gh);
-
-    const blurb = document.createElement('div');
-    blurb.className = 'credits-blurb';
-    blurb.textContent = 'Built with Three.js + Vite';
-    panel.appendChild(blurb);
-
-    const row = document.createElement('div');
-    row.className = 'btn-row';
-    row.appendChild(this.makeBtn('Back', 'secondary', () => {
-      this.ui.show(this.returnTo || 'tap');
-    }));
-    panel.appendChild(row);
+    const creditsLink = document.createElement('a');
+    creditsLink.className = 'credits-file-link';
+    creditsLink.href = 'https://github.com/fadilp5x/musliyarkutti-malabar-runner-game/blob/main/CREDITS.md';
+    creditsLink.target = '_blank';
+    creditsLink.rel = 'noopener';
+    creditsLink.textContent = 'Full asset credits · CREDITS.md';
+    creditsLink.addEventListener('click', (event) => event.stopPropagation());
+    panel.appendChild(creditsLink);
   }
 
   // ---------------------------------------------------------------- pause
   _buildPause() {
-    const { panel } = this.makeScreen('pause');
-    const t = document.createElement('h2');
-    t.className = 'panel-title';
-    t.textContent = 'Paused';
-    panel.appendChild(t);
+    const { panel } = this.makeScreen('pause', 'Paused');
 
     panel.appendChild(this.makeBtn('Resume', '', () => {
       try { this.game.togglePause?.(); } catch { /* noop */ }
@@ -317,6 +397,7 @@ export class MenuController {
     };
     go('Settings', 'settings');
     go('Missions', 'missions');
+    go('Goals', 'goals');
     go('Inventory', 'inventory');
     go('Wallet', 'wallet');
     panel.appendChild(row);
@@ -329,11 +410,7 @@ export class MenuController {
 
   // ---------------------------------------------------------------- gameover
   _buildGameOver() {
-    const { panel } = this.makeScreen('gameover');
-    const t = document.createElement('h2');
-    t.className = 'panel-title';
-    t.textContent = 'Game Over';
-    panel.appendChild(t);
+    const { panel } = this.makeScreen('gameover', 'Run complete');
 
     this.goBest = document.createElement('div');
     this.goBest.className = 'newbest hidden';
@@ -346,17 +423,19 @@ export class MenuController {
 
     const row = document.createElement('div');
     row.className = 'btn-row';
-    row.appendChild(this.makeBtn('Run Again', '', () => {
+    row.appendChild(this.makeBtn('Play Again', 'primary gameover-replay', () => {
       try { this.game.restart?.(); } catch { /* noop */ }
     }));
-    row.appendChild(this.makeBtn('Wallet', 'secondary small', () => {
-      this.returnTo = 'gameover';
-      this.ui.show('wallet');
-    }));
-    row.appendChild(this.makeBtn('Menu', 'secondary small', () => {
+    const nav = document.createElement('div');
+    nav.className = 'btn-row gameover-home-row';
+    nav.appendChild(this.makeBtn('Home', 'secondary small', () => {
       this.ui.show('tap');
     }));
+    nav.appendChild(this.makeBtn('Multiplayer', 'secondary small', () => {
+      document.querySelector('.party-trigger')?.click();
+    }));
     panel.appendChild(row);
+    panel.appendChild(nav);
   }
 
   renderGameOver(data = {}) {
@@ -380,29 +459,46 @@ export class MenuController {
       c.appendChild(l);
       c.appendChild(v);
       grid.appendChild(c);
+      this._countUp(v, value);
     }
     const isBest = !!data.isNewBest;
     this.goBest.classList.toggle('hidden', !isBest);
   }
 
+  _countUp(element, value) {
+    const match = String(value).match(/^([\d,]+)(.*)$/);
+    if (!match) return;
+    const target = Number(match[1].replace(/,/g, ''));
+    if (!Number.isFinite(target) || target <= 0 || this.ui.root.classList.contains('reduced-motion')) return;
+    const suffix = match[2];
+    const start = performance.now();
+    const duration = 520;
+    const tick = (now) => {
+      const p = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - p, 3);
+      element.textContent = Math.floor(target * eased).toLocaleString() + suffix;
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    element.textContent = '0' + suffix;
+    requestAnimationFrame(tick);
+  }
+
   // ---------------------------------------------------------------- settings
   _buildSettings() {
-    const { panel } = this.makeScreen('settings');
-    const t = document.createElement('h2');
-    t.className = 'panel-title';
-    t.textContent = 'Settings';
-    panel.appendChild(t);
+    const { panel } = this.makeScreen('settings', 'Settings');
 
     this.settingsRows = document.createElement('div');
     this.settingsRows.className = 'scroll-list';
     panel.appendChild(this.settingsRows);
 
-    const row = document.createElement('div');
-    row.className = 'btn-row';
-    row.appendChild(this.makeBtn('Back', 'secondary', () => {
-      this.ui.show(this.returnTo || 'tap');
-    }));
-    panel.appendChild(row);
+    const guide = document.createElement('details');
+    guide.className = 'controls-hint settings-guide';
+    const guideTitle = document.createElement('summary');
+    guideTitle.textContent = 'How to play';
+    const guideCopy = document.createElement('p');
+    guideCopy.textContent = 'Swipe or use ← → to change lanes · swipe up or ↑ / Space to jump · swipe down or ↓ / S to slide · Esc to pause.';
+    guide.append(guideTitle, guideCopy);
+    this.settingsRows.after(guide);
   }
 
   renderSettings() {
@@ -578,22 +674,12 @@ export class MenuController {
 
   // ---------------------------------------------------------------- missions
   _buildMissions() {
-    const { panel } = this.makeScreen('missions');
-    const t = document.createElement('h2');
-    t.className = 'panel-title';
-    t.textContent = 'Missions';
-    panel.appendChild(t);
+    const { panel } = this.makeScreen('missions', 'Missions');
 
     this.missionList = document.createElement('div');
     this.missionList.className = 'scroll-list';
     panel.appendChild(this.missionList);
 
-    const row = document.createElement('div');
-    row.className = 'btn-row';
-    row.appendChild(this.makeBtn('Back', 'secondary', () => {
-      this.ui.show(this.returnTo || 'tap');
-    }));
-    panel.appendChild(row);
   }
 
   renderMissions() {
@@ -672,11 +758,7 @@ export class MenuController {
 
   // ---------------------------------------------------------------- inventory
   _buildInventory() {
-    const { panel } = this.makeScreen('inventory');
-    const t = document.createElement('h2');
-    t.className = 'panel-title';
-    t.textContent = 'Glide Boards';
-    panel.appendChild(t);
+    const { panel } = this.makeScreen('inventory', 'Glide Boards');
 
     this.invBalance = document.createElement('div');
     this.invBalance.className = 'coin-balance';
@@ -686,12 +768,6 @@ export class MenuController {
     this.invList.className = 'scroll-list';
     panel.appendChild(this.invList);
 
-    const row = document.createElement('div');
-    row.className = 'btn-row';
-    row.appendChild(this.makeBtn('Back', 'secondary', () => {
-      this.ui.show(this.returnTo || 'tap');
-    }));
-    panel.appendChild(row);
   }
 
   renderInventory() {
@@ -775,8 +851,137 @@ export class MenuController {
     this._buildGameOver();
     this._buildSettings();
     this._buildMissions();
+    this._buildGoals();
     this._buildInventory();
+    this._buildWardrobe();
     this._buildCredits();
     // 'wallet' screen is built lazily by VoucherWalletUI.
+  }
+
+  _buildGoals() {
+    const { panel } = this.makeScreen('goals', 'Goals');
+    this.goalSummary = document.createElement('div');
+    this.goalSummary.className = 'goal-summary';
+    panel.appendChild(this.goalSummary);
+    this.goalList = document.createElement('div');
+    this.goalList.className = 'scroll-list goal-list';
+    panel.appendChild(this.goalList);
+    const row = document.createElement('div');
+    row.className = 'btn-row page-action-bar';
+    row.appendChild(this.makeBtn('View missions', 'secondary', () => this.ui.show('missions')));
+    panel.appendChild(row);
+  }
+
+  renderGoals() {
+    this.goalList.replaceChildren();
+    const balance = Math.floor(this.game.save?.load?.()?.coins || 0);
+    const goals = this.game.goals?.list?.() || [];
+    const readyCount = goals.filter((goal) => goal.progress >= goal.target).length;
+    this.goalSummary.textContent = `${readyCount} of ${goals.length} goals ready to claim · ${balance} coins`;
+    const orderedGoals = goals.map((goal, index) => ({ goal, index })).sort((a, b) => Number(b.goal.progress >= b.goal.target) - Number(a.goal.progress >= a.goal.target) || a.index - b.index).map(({ goal }) => goal);
+    for (const goal of orderedGoals) {
+      const card = document.createElement('article');
+      card.className = 'goal-card';
+      const head = document.createElement('div');
+      head.className = 'goal-head';
+      const title = document.createElement('strong');
+      title.textContent = `${goal.name} · Level ${goal.level}`;
+      const reward = document.createElement('span');
+      reward.textContent = `+${goal.reward} coins`;
+      head.append(title, reward);
+      const detail = document.createElement('p');
+      detail.textContent = goal.detail;
+      const progress = document.createElement('div');
+      progress.className = 'goal-progress';
+      const fill = document.createElement('i');
+      fill.style.width = `${Math.min(100, goal.progress / goal.target * 100)}%`;
+      progress.appendChild(fill);
+      const foot = document.createElement('div');
+      foot.className = 'goal-foot';
+      const count = document.createElement('span');
+      const unit = goal.stat === 'distance' || goal.stat === 'runDistance' ? 'm' : '';
+      count.textContent = `${Math.floor(Math.min(goal.progress, goal.target))} / ${goal.target} ${unit}`.trim();
+      if (goal.progress >= goal.target) {
+        const claim = document.createElement('button');
+        claim.type = 'button';
+        claim.className = 'btn btn-primary small goal-claim';
+        claim.textContent = 'Claim';
+        claim.addEventListener('click', this.click(() => {
+          this.game.claimGoal?.(goal.id);
+          this.renderGoals();
+        }));
+        foot.append(count, claim);
+      } else {
+        const state = document.createElement('span');
+        state.className = 'goal-state';
+        state.textContent = count.textContent;
+        foot.append(state);
+      }
+      card.append(head, detail, progress, foot);
+      this.goalList.appendChild(card);
+    }
+  }
+
+  _buildWardrobe() {
+    const { panel } = this.makeScreen('wardrobe', 'Wardrobe');
+    const note = document.createElement('p');
+    note.className = 'wardrobe-note';
+    note.textContent = 'Choose cloth colours for your jubba, thalappav and lungi border. Earn Arabic-letter coins on the road to unlock more looks.';
+    panel.appendChild(note);
+    this.wardrobeBalance = document.createElement('div');
+    this.wardrobeBalance.className = 'coin-balance';
+    panel.appendChild(this.wardrobeBalance);
+    this.wardrobeList = document.createElement('div');
+    this.wardrobeList.className = 'scroll-list wardrobe-list';
+    panel.appendChild(this.wardrobeList);
+  }
+
+  renderWardrobe() {
+    this.wardrobeList.replaceChildren();
+    const balance = Math.floor(this.game.save?.load?.()?.coins || 0);
+    this.wardrobeBalance.textContent = `Arabic-letter coins: ${balance}`;
+    const owned = this.game.wardrobe?.owned || ['classic'];
+    const selected = this.game.wardrobe?.selected || 'classic';
+    for (const skin of this.game.wardrobe?.skins || []) {
+      const card = document.createElement('article');
+      card.className = `wardrobe-card${selected === skin.id ? ' selected' : ''}`;
+      const swatch = document.createElement('div');
+      swatch.className = 'wardrobe-swatch';
+      for (const [part, color] of [['jubba', skin.colors.jubba], ['thalappav', skin.colors.thalappav], ['border', skin.colors.border]]) {
+        const chip = document.createElement('i');
+        chip.className = `cloth-${part}`;
+        chip.style.backgroundColor = `#${color.toString(16).padStart(6, '0')}`;
+        swatch.appendChild(chip);
+      }
+      const info = document.createElement('div');
+      info.className = 'wardrobe-info';
+      const name = document.createElement('strong');
+      name.textContent = skin.name;
+      const status = document.createElement('span');
+      status.textContent = owned.includes(skin.id) ? (selected === skin.id ? 'Wearing' : 'Owned') : `${skin.cost} coins`;
+      info.append(name, status);
+      const action = document.createElement('button');
+      action.type = 'button';
+      action.className = 'btn small';
+      if (selected === skin.id) {
+        action.textContent = 'Selected';
+        action.disabled = true;
+      } else if (owned.includes(skin.id)) {
+        action.textContent = 'Wear';
+        action.addEventListener('click', this.click(() => {
+          this.game.selectSkin?.(skin.id);
+          this.renderWardrobe();
+        }));
+      } else {
+        action.textContent = 'Unlock';
+        action.disabled = balance < skin.cost;
+        action.addEventListener('click', this.click(() => {
+          this.game.buySkin?.(skin.id);
+          this.renderWardrobe();
+        }));
+      }
+      card.append(swatch, info, action);
+      this.wardrobeList.appendChild(card);
+    }
   }
 }

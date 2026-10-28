@@ -1,6 +1,8 @@
 // tests/save.test.js — SaveManager (engine workstream).
 import { describe, it, expect } from 'vitest';
 import { SaveManager } from '../src/game/SaveManager.js';
+import { Goals } from '../src/game/Goals.js';
+import { Wardrobe } from '../src/game/Wardrobe.js';
 
 // Minimal fake storage implementing getItem/setItem/removeItem.
 function fakeStorage(initial = {}) {
@@ -57,5 +59,35 @@ describe('SaveManager', () => {
     const defaults = new SaveManager(fakeStorage()).load();
     expect(mgr.load()).toEqual(defaults);
     expect(storage.getItem('mmr.highscore')).toBeNull();
+  });
+
+  it('persists progressive goals and wardrobe selection across a reload', () => {
+    const storage = fakeStorage();
+    const goals = new Goals();
+    goals.update({ coins: 30 });
+    expect(goals.claim('arabic-letters')).toBe(25);
+    const wardrobe = new Wardrobe();
+    expect(wardrobe.buy('monsoon', 250)).toBe(true);
+    wardrobe.select('monsoon');
+    new SaveManager(storage).save({ goals: goals.serialize(), wardrobe: wardrobe.serialize() });
+
+    const reloaded = new SaveManager(storage).load();
+    const loadedGoals = new Goals();
+    loadedGoals.load(reloaded.goals);
+    const loadedWardrobe = new Wardrobe();
+    loadedWardrobe.load(reloaded.wardrobe);
+    expect(loadedGoals.get('arabic-letters')).toMatchObject({ level: 2, progress: 0, target: 50 });
+    expect(loadedWardrobe).toMatchObject({ owned: ['classic', 'monsoon'], selected: 'monsoon' });
+  });
+
+  it('falls back to default goals and wardrobe for corrupt saves', () => {
+    const storage = fakeStorage({
+      'mmr.goals': JSON.stringify({ version: 1, goals: { 'arabic-letters': { level: 1, progress: 1e99 } } }),
+      'mmr.wardrobe': JSON.stringify({ owned: ['classic', 'unlisted-skin'], selected: 'unlisted-skin' }),
+    });
+    const loaded = new SaveManager(storage).load();
+    const defaults = new SaveManager(fakeStorage()).load();
+    expect(loaded.goals).toEqual(defaults.goals);
+    expect(loaded.wardrobe).toEqual(defaults.wardrobe);
   });
 });

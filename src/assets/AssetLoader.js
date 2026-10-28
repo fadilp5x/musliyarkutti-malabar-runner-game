@@ -79,8 +79,9 @@ export class AssetLoader {
 
   // Loads every game SVG; returns { baseName: THREE.Texture }.
   // A single failure resolves to null for that key instead of rejecting.
-  async loadAll() {
+  async loadAll({ onProgress } = {}) {
     const out = {};
+    let loaded = 0;
     await Promise.all(
       SVG_FILES.map(async (name) => {
         try {
@@ -88,6 +89,9 @@ export class AssetLoader {
         } catch (err) {
           console.warn(`[assets] failed to load ${name}.svg:`, err);
           out[name] = null;
+        } finally {
+          loaded += 1;
+          onProgress?.({ loaded, total: SVG_FILES.length, name });
         }
       })
     );

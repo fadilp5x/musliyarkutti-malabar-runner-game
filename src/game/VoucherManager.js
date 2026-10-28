@@ -19,6 +19,8 @@ export const VOUCHER_STORES = [
 
 // Minimum metres between voucher spawns.
 export const VOUCHER_MIN_INTERVAL_M = 120;
+// Roll at fixed distance checkpoints so probability is independent of tick rate.
+export const VOUCHER_CHECK_INTERVAL_M = 25;
 
 // Spawn probability per eligible check.
 export const VOUCHER_SPAWN_CHANCE = 0.45;
@@ -27,6 +29,7 @@ export class VoucherManager {
   constructor(rng = Math.random) {
     this.rng = rng;
     this.lastSpawnM = -1e9;
+    this.nextCheckM = VOUCHER_UNLOCK_M;
   }
 
   /** THE rule: vouchers unlock at >= 500 m. */
@@ -42,15 +45,21 @@ export class VoucherManager {
   shouldSpawn(distanceM) {
     if (!this.canSpawn(distanceM)) return false;
     if (distanceM - this.lastSpawnM < VOUCHER_MIN_INTERVAL_M) return false;
-    return this.rng() < VOUCHER_SPAWN_CHANCE;
+    while (this.nextCheckM <= distanceM) {
+      this.nextCheckM += VOUCHER_CHECK_INTERVAL_M;
+      if (this.rng() < VOUCHER_SPAWN_CHANCE) return true;
+    }
+    return false;
   }
 
   /** Record that a voucher spawned at distanceM (starts the 120 m cooldown). */
   recordSpawn(distanceM) {
     this.lastSpawnM = distanceM;
+    this.nextCheckM = distanceM + VOUCHER_MIN_INTERVAL_M;
   }
 
   reset() {
     this.lastSpawnM = -1e9;
+    this.nextCheckM = VOUCHER_UNLOCK_M;
   }
 }

@@ -1,6 +1,8 @@
 // SaveManager — PURE module (no three, no DOM).
 // Persists progress under mmr.* keys. Accepts any storage-like object
 // ({getItem,setItem,removeItem}) so tests can inject a fake. Never throws.
+import { defaultGoalsSave, isValidGoalsSave } from './Goals.js';
+import { defaultWardrobeSave, isValidWardrobeSave } from './Wardrobe.js';
 
 const KEYS = {
   highscore: 'mmr.highscore',
@@ -11,6 +13,8 @@ const KEYS = {
   wallet: 'mmr.wallet',
   missions: 'mmr.missions',
   inventory: 'mmr.inventory',
+  goals: 'mmr.goals',
+  wardrobe: 'mmr.wardrobe',
   hasSeenIntro: 'mmr.hasSeenIntro',
   tutorialPreference: 'mmr.tutorialPreference',
 };
@@ -52,6 +56,8 @@ function defaults() {
     wallet: [],
     missions: {},
     inventory: { owned: ['palm'], selected: 'palm' },
+    goals: defaultGoalsSave(),
+    wardrobe: defaultWardrobeSave(),
   };
 }
 
@@ -136,6 +142,12 @@ export class SaveManager {
         d.inventory = { owned, selected };
       }
 
+      const goals = this._read(KEYS.goals);
+      if (isValidGoalsSave(goals)) d.goals = goals;
+
+      const wardrobe = this._read(KEYS.wardrobe);
+      if (isValidWardrobeSave(wardrobe)) d.wardrobe = wardrobe;
+
       // Oct 14, 2026: cinematic/tutorial flags
       const hasSeenIntro = this._read(KEYS.hasSeenIntro);
       if (typeof hasSeenIntro === 'boolean') d.hasSeenIntro = hasSeenIntro;
@@ -181,6 +193,8 @@ export class SaveManager {
       if ('inventory' in patch && patch.inventory && typeof patch.inventory === 'object' && !Array.isArray(patch.inventory)) {
         this._write(KEYS.inventory, patch.inventory);
       }
+      if ('goals' in patch && isValidGoalsSave(patch.goals)) this._write(KEYS.goals, patch.goals);
+      if ('wardrobe' in patch && isValidWardrobeSave(patch.wardrobe)) this._write(KEYS.wardrobe, patch.wardrobe);
       // Oct 14, 2026: cinematic/tutorial flags
       if ('hasSeenIntro' in patch) {
         this._write(KEYS.hasSeenIntro, !!patch.hasSeenIntro);

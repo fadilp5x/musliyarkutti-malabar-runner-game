@@ -156,6 +156,15 @@ export class CollectibleManager {
     this._lastPatternM = 0;
     this._jetpack = false;
     this._t = 0;
+    this._coinRng = Math.random;
+    this._voucherRng = Math.random;
+    this.onSpawn = null;
+    this.distanceM = 0;
+  }
+
+  setRandomStreams({ coins = Math.random, vouchers = Math.random } = {}) {
+    this._coinRng = coins;
+    this._voucherRng = vouchers;
   }
 
   _freeCoin() {
@@ -165,10 +174,14 @@ export class CollectibleManager {
   _spawnCoin(lane, z, y) {
     const mesh = this._freeCoin();
     if (!mesh) return;
+    // Value changes the pickup outcome, so it must consume the seeded coin stream.
+    const value = this._coinRng() < 0.025 ? 10 : 1;
     mesh.visible = true;
+    mesh.scale.setScalar(value === 10 ? 1.48 : 1);
     mesh.position.set(LANES[lane], y, z);
     mesh.rotation.set(0, Math.random() * 6.28, 0);
-    this.coins.push({ mesh, lane, z, y, taken: false, spin: 3 + Math.random() * 3, mx: 0, my: 0 });
+    this.coins.push({ mesh, lane, z, y, value, taken: false, spin: 3 + Math.random() * 3, mx: 0, my: 0 });
+    this.onSpawn?.({ kind: 'coin', type: value === 10 ? 'coin10' : 'coin', lane, distanceM: this.distanceM });
   }
 
   /**
@@ -179,24 +192,28 @@ export class CollectibleManager {
   spawnPatterns(distanceM) {
     if (distanceM - this._lastPatternM < 25) return;
     this._lastPatternM = distanceM;
-    const r = Math.random();
+    this.distanceM = distanceM;
+    const r = this._coinRng();
     const baseY = this._jetpack ? 3.4 : 1.0;
-    if (r < 0.4) {
+    if (r < 0.35) {
       // line: 5 coins in one lane
-      const lane = (Math.random() * 3) | 0;
+      const lane = (this._coinRng() * 3) | 0;
       for (let i = 0; i < 5; i++) this._spawnCoin(lane, SPAWN_Z - i * 2.4, baseY);
-    } else if (r < 0.7) {
-      // arc: 7 coins sweeping across the lanes
-      for (let i = 0; i < 7; i++) {
-        const lane = Math.max(0, Math.min(2, Math.round(1 + Math.sin((i / 6) * Math.PI * 2))));
-        const y = baseY + Math.sin((i / 6) * Math.PI) * 1.1;
-        this._spawnCoin(lane, SPAWN_Z - i * 2.4, y);
-      }
-    } else {
+    } else if (r < 0.62) {
       // zigzag: 8 coins alternating lanes
       const seq = [0, 1, 2, 1, 0, 1, 2, 1];
-      const off = (Math.random() * 3) | 0;
+      const off = (this._coinRng() * 3) | 0;
       for (let i = 0; i < 8; i++) this._spawnCoin(seq[(i + off) % seq.length], SPAWN_Z - i * 2.6, baseY);
+    } else {
+      // Seeded curved arc: eight coins rise and descend while sweeping all lanes.
+      const direction = this._coinRng() < 0.5 ? -1 : 1;
+      const laneOffset = (this._coinRng() * 3) | 0;
+      for (let i = 0; i < 8; i++) {
+        const t = i / 7;
+        const curve = Math.sin(t * Math.PI);
+        const lane = Math.max(0, Math.min(2, Math.round(laneOffset + direction * Math.sin(t * Math.PI * 1.5))));
+        this._spawnCoin(lane, SPAWN_Z - i * 2.3, baseY + curve * 1.25);
+      }
     }
   }
 
@@ -204,8 +221,8 @@ export class CollectibleManager {
    * Spawn a floating voucher card. The caller (engine) MUST gate this with
    * VoucherManager.canSpawn/shouldSpawn — never below 500 m.
    */
-  spawnVoucher(lane) {
-    const store = VOUCHER_STORES[(Math.random() * VOUCHER_STORES.length) | 0];
+  spawnVoucher(lane, distanceM = this.distanceM) {
+    const store = VOUCHER_STORES[(this._voucherRng() * VOUCHER_STORES.length) | 0];
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(1.2, 0.8),
       new THREE.MeshBasicMaterial({ map: voucherTexture(store), side: THREE.DoubleSide, transparent: true })
@@ -213,6 +230,7 @@ export class CollectibleManager {
     mesh.position.set(LANES[lane], 1.2, SPAWN_Z);
     this.scene.add(mesh);
     this.vouchers.push({ mesh, lane, z: SPAWN_Z, store, bob: Math.random() * 6.28 });
+    this.onSpawn?.({ kind: 'voucher', type: store, lane, distanceM });
     return store;
   }
 
@@ -251,7 +269,7 @@ export class CollectibleManager {
         c.taken = true;
         c.mesh.visible = false;
         this.coins.splice(i, 1);
-        this.events.emit('coin', 1);
+        this.events.emit('coin', c.value || 1);
       }
     }
 
@@ -285,5 +303,6 @@ export class CollectibleManager {
     this.vouchers = [];
     this._lastPatternM = 0;
     this._jetpack = false;
+    this.distanceM = 0;
   }
 }

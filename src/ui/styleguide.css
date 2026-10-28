@@ -1,0 +1,184 @@
+body.styleguide-mode {
+  overflow: hidden;
+  background: var(--color-cloud);
+  color: var(--color-ink);
+  font-family: var(--font-ui);
+}
+
+body.styleguide-mode #game,
+body.styleguide-mode #ui { display: none !important; }
+
+.styleguide-page {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-styleguide);
+  overflow: auto;
+  box-sizing: border-box;
+  padding: clamp(20px, 4vw, 48px);
+  color: var(--color-ink);
+  background:
+    radial-gradient(circle at 92% 0%, rgb(63 169 245 / 13%), transparent 26rem),
+    var(--color-cloud);
+  font-family: var(--font-ui);
+  line-height: 1.5;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.styleguide-page * { box-sizing: border-box; }
+.styleguide-page h1,
+.styleguide-page h2,
+.styleguide-page p { margin-top: 0; }
+
+.styleguide-header {
+  display: flex;
+  max-width: 1100px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  margin: 0 auto var(--space-8);
+}
+
+.styleguide-header h1 {
+  margin-bottom: var(--space-2);
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+
+.styleguide-header p { margin-bottom: 0; }
+.styleguide-eyebrow {
+  margin-bottom: var(--space-2) !important;
+  color: var(--color-green-700);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.styleguide-section {
+  max-width: 1100px;
+  margin: 0 auto var(--space-8);
+}
+
+.styleguide-section > h2,
+.styleguide-type h2,
+.styleguide-grid > article > h2 {
+  margin-bottom: var(--space-4);
+  font-size: 1.4rem;
+}
+
+.styleguide-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--space-3);
+}
+
+.styleguide-swatch {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  align-items: center;
+  gap: 0 var(--space-2);
+  min-height: 56px;
+  padding: var(--space-2);
+  background: var(--color-white);
+  border: 1px solid rgb(16 48 31 / 12%);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+}
+
+.styleguide-swatch-color {
+  grid-row: span 2;
+  width: 40px;
+  height: 40px;
+  background: var(--swatch);
+  border: 1px solid rgb(16 48 31 / 12%);
+  border-radius: 10px;
+}
+
+.styleguide-swatch code,
+.styleguide-scale code {
+  font: 500 0.72rem/1.3 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.styleguide-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.styleguide-grid > article { min-width: 0; }
+.styleguide-font-sample { font-size: clamp(1.3rem, 3vw, 2rem); font-weight: 600; }
+.styleguide-system-sample { font: 1.15rem/1.7 system-ui, sans-serif; }
+.styleguide-type small { display: block; font: 0.9rem/1.5 system-ui, sans-serif; }
+
+.styleguide-scale,
+.styleguide-radius,
+.styleguide-components {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.styleguide-scale code {
+  display: grid;
+  min-width: 40px;
+  min-height: 40px;
+  place-items: center;
+  background: var(--color-gold-400);
+  border-radius: var(--radius-md);
+}
+
+.styleguide-radius { margin: var(--space-4) 0; }
+.styleguide-radius span {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  padding: 0 var(--space-3);
+  background: var(--color-sky-400);
+  border: 2px solid var(--color-ink);
+}
+.styleguide-radius span:nth-child(1) { border-radius: 12px; }
+.styleguide-radius span:nth-child(2) { border-radius: 16px; }
+.styleguide-radius span:nth-child(3) { border-radius: 999px; }
+
+.styleguide-components { margin-bottom: var(--space-4); }
+.styleguide-card {
+  display: flex;
+  max-width: 500px;
+  min-height: 72px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.styleguide-table-wrap {
+  overflow-x: auto;
+  background: var(--color-white);
+  border: 3px solid var(--color-ink);
+  border-radius: var(--radius-lg);
+}
+
+.styleguide-page table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.styleguide-page th,
+.styleguide-page td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid rgb(16 48 31 / 14%);
+}
+
+.styleguide-page thead { background: var(--color-green-500); }
+.styleguide-page tbody tr:last-child > * { border-bottom: 0; }
+.styleguide-pass { color: var(--color-green-700); font-weight: 700; }
+.styleguide-page footer { max-width: 1100px; margin: 0 auto; padding-bottom: var(--space-6); }
+
+@media (max-width: 700px) {
+  .styleguide-header { align-items: flex-start; flex-direction: column; }
+  .styleguide-grid { grid-template-columns: 1fr; }
+  .styleguide-card { align-items: flex-start; flex-direction: column; }
+}

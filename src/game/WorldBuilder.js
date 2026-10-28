@@ -20,6 +20,38 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // across the whole game — no duplicate materials).
 import { std as sharedStd } from './Materials.js';
 
+const WINDMILL_BLADE_NODES = /^Cube\.(?:008|009|010|011)$/;
+
+function isWindmillBlade(object) {
+  if (WINDMILL_BLADE_NODES.test(object.name)) return true;
+  if (!object.geometry) return false;
+  if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
+  const size = object.geometry.boundingBox.getSize(new THREE.Vector3());
+  // The GLB parser may expose the mesh-definition name instead of its node
+  // name. The rotor blades are uniquely long along local X (about 31:2:1.5).
+  return size.x > 5 && size.x > size.y * 8 && size.x > size.z * 8;
+}
+
+// The supplied GLB gives its four rotor blades a near-black red material and
+// very narrow local Y dimensions. Keep the original shape, but widen and
+// lighten the blades so they read as solid blades instead of crossed lines.
+export function styleWindmillBlades(root) {
+  root.traverse((object) => {
+    if (!object.isMesh || !isWindmillBlade(object)) return;
+    object.scale.y *= 3;
+    const brighten = (material) => {
+      const blade = material.clone();
+      if (blade.color) blade.color.setHex(0xdde3e7);
+      if (blade.metalness !== undefined) blade.metalness = 0.12;
+      if (blade.roughness !== undefined) blade.roughness = 0.72;
+      return blade;
+    };
+    object.material = Array.isArray(object.material)
+      ? object.material.map(brighten)
+      : brighten(object.material);
+  });
+}
+
 // ---------- module-level geometry / material caches (shared, modest draw calls)
 const _geo = new Map();
 function boxGeo(w, h, d) {
@@ -1357,9 +1389,11 @@ export class WorldBuilder {
     try {
       const handle = await modelLoader.loadModel('windmill');
       const spots = [[-14, -70], [14, -150]];
+      const sources = [handle.object3D, handle.object3D.clone()];
       for (let i = 0; i < spots.length; i++) {
-        const src = i === 0 ? handle.object3D : handle.object3D.clone();
+        const src = sources[i];
         if (src.parent) src.parent.remove(src);
+        styleWindmillBlades(src);
         const fitted = this._fitModel(src, 3.91, 0);
         fitted.traverse((o) => { if (o.isMesh) o.castShadow = true; });
         fitted.position.set(spots[i][0], 0, spots[i][1]);

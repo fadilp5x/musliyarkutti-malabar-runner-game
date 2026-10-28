@@ -1,20 +1,20 @@
-/* Base styles for MUSLIYARKUTTI: MALABAR RUNNER.
-   Engine-owned shell. The UI workstream adds src/ui/screens.css (imported by UI.js).
-   Palette: --navy #1A1A2E, --ivory #faf7f0, --gold #FFD700, --cyan #2979FF. */
+/* Base styles for MUSLIYARKUTTI: MALABAR RUNNER. */
+
+/* Shared design tokens and UI component primitives. */
+@import './tokens.css';
 
 :root {
-  --navy: #1a1a2e;
-  --navy-deep: #16213e;
-  --ivory: #fafafa;
-  --gold: #ffd700;
-  --gold-deep: #8b6914;
-  --cyan: #2979ff;
-  --cyan-deep: #1565c0;
-  --danger: #e4000f;
-  --success: #00c853;
-  --radius: 18px;
-  --font-stack: "Trebuchet MS", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --navy: var(--color-ink);
+  --navy-deep: var(--color-ink);
+  --ivory: var(--color-cloud);
+  --gold: var(--color-gold-400);
+  --gold-deep: var(--color-gold-600);
+  --cyan: var(--color-sky-400);
+  --cyan-deep: var(--color-sky-600);
+  --danger: var(--color-coral-700);
+  --success: var(--color-green-700);
+  --radius: var(--radius-lg);
+  --font-stack: var(--font-ui);
 }
 
 html,

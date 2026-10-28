@@ -6,6 +6,7 @@ import { HUD } from './HUD.js';
 import { MenuController } from './MenuController.js';
 import { VoucherWalletUI } from './VoucherWalletUI.js';
 import { SubtitleManager } from './SubtitleManager.js';
+import { ParticleLayer } from './ParticleLayer.js';
 
 export class UI {
   constructor(game, rootEl) {
@@ -13,6 +14,8 @@ export class UI {
     this.game = game;
     this.root = rootEl;
     this.root.classList.add('mmr-ui');
+
+    this.particles = new ParticleLayer(game, this.root);
 
     this.screensEl = document.createElement('div');
     this.screensEl.className = 'mmr-screens';
@@ -92,7 +95,14 @@ export class UI {
         this._setSkipHint(false);
         break;
       case 'LIBRARY':
-        this.show('tap');
+        this.menus.markLoadingComplete?.();
+        // First session load waits for the user to tap, which also unlocks audio.
+        if ((this.menus._loadingMinMs > 0 && !this.menus._loadingStartDismissed) ||
+            new URLSearchParams(window.location.search).get('loading-preview') === '1') {
+          this.show('loading');
+        } else {
+          this.show('tap');
+        }
         this._setSkipHint(false);
         this.subtitles.stop();
         break;
@@ -174,6 +184,11 @@ export class UI {
 
   show(name, data) {
     this.current = name;
+    if (name !== 'hud') {
+      this.subtitles.stop();
+      this._setSkipHint(false);
+    }
+    this.particles.setScreen(name);
     for (const [n, el] of this.screenMap) {
       el.classList.toggle('hidden', n !== name);
     }
@@ -182,7 +197,9 @@ export class UI {
     if (name === 'gameover') this.menus.renderGameOver(data || {});
     else if (name === 'settings') this.menus.renderSettings();
     else if (name === 'missions') this.menus.renderMissions();
+    else if (name === 'goals') this.menus.renderGoals();
     else if (name === 'inventory') this.menus.renderInventory();
+    else if (name === 'wardrobe') this.menus.renderWardrobe();
     else if (name === 'tap') this.menus.renderTap?.();
     else if (name === 'wallet') this.walletUI.render();
 
@@ -198,6 +215,7 @@ export class UI {
 
   hideAll() {
     this.current = null;
+    this.particles.setScreen(null);
     for (const el of this.screenMap.values()) el.classList.add('hidden');
     this.hud.setVisible(false);
   }

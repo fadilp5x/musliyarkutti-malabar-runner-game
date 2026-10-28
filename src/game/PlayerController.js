@@ -129,6 +129,7 @@ export class PlayerController {
         this.y = 0;
         this.vy = 0;
         this.jumping = false;
+        this.avatar.triggerLanding?.();
         this.events.emit('land');
         this._applyLocomotion();
       }
