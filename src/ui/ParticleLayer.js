@@ -8,6 +8,7 @@ export class ParticleLayer {
     this.canvas = null;
     this.ctx = null;
     this.particles = [];
+    this.burstParticles = [];
     this.active = false;
     this.frame = 0;
     this.lastTime = 0;
@@ -41,6 +42,17 @@ export class ParticleLayer {
 
   qualityChanged() {
     if (this.active && this.canvas && !this._reduced) this.resize();
+  }
+
+  burst(count = 10) {
+    if (!this.active || !this.canvas || this._reduced || document.hidden) return;
+    const cx = this.width / 2;
+    const cy = this.height * 0.48;
+    this.burstParticles = Array.from({ length: Math.max(0, Math.min(16, count)) }, () => {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 45 + Math.random() * 70;
+      return { x: cx, y: cy, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 0.45 + Math.random() * 0.3, maxLife: 0.75, size: 2 + Math.random() * 3 };
+    });
   }
 
   setReducedMotion(enabled) {
@@ -77,6 +89,7 @@ export class ParticleLayer {
     this.canvas = null;
     this.ctx = null;
     this.particles = [];
+    this.burstParticles = [];
   }
 
   _count() {
@@ -145,6 +158,18 @@ export class ParticleLayer {
       if (p.y < -24) this.particles[i] = this._newParticle(i, this.particles.length);
       else this._paint(ctx, p, time, { gold, goldDark, ink, green, white });
     }
+    this.burstParticles = this.burstParticles.filter((p) => p.life > 0);
+    for (const p of this.burstParticles) {
+      p.life -= dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+      ctx.fillStyle = p.size > 4 ? gold : white;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
     this.drawTimeMs = performance.now() - drawStart;
     window.__mmrParticleDrawMs = this.drawTimeMs;
     this.frame = requestAnimationFrame((nextTime) => this._draw(nextTime));

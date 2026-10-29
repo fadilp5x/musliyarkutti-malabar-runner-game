@@ -71,6 +71,7 @@ const SYNTH_DIRECT = {
   voucher: '_voucher',
   click: '_click',
   start: '_start',
+  join_chime: '_joinChime',
 };
 
 // File-backed name → procedural method used when the file is unavailable.
@@ -649,6 +650,12 @@ export class AudioManager {
   _powerup() {
     const notes = [523, 659, 784];
     notes.forEach((f, i) => this._tone({ freq: f, dur: 0.12, type: 'triangle', vol: 0.35, delay: i * 0.08 }));
+  }
+
+  _joinChime() {
+    // A brief, gentle two-note lobby accent; routed through normal SFX volume.
+    this._tone({ freq: 784, dur: 0.14, type: 'sine', vol: 0.16, via: 'effects' });
+    this._tone({ freq: 1047, dur: 0.2, type: 'sine', vol: 0.14, delay: 0.11, via: 'effects' });
   }
 
   _voucher() {

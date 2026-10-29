@@ -181,8 +181,12 @@
 .party-dua-boost:active { transform: translateY(3px); }
 .party-event-toast { position: fixed; z-index: var(--z-toast); top: 24%; left: 50%; max-width: min(90vw, 420px); padding: 12px 18px; border: 3px solid var(--color-ink); border-radius: var(--radius-pill); color: var(--color-ink); background: var(--color-white); box-shadow: var(--shadow-toast); font: 700 1rem/1.2 var(--font-ui); text-align: center; opacity: 0; transform: translate(-50%, 8px); pointer-events: none; }
 .party-event-toast.is-visible { animation: party-event-in 1.3s var(--ease-bouncy) both; }
+.party-event-toast.is-visible.is-join-celebration { animation: party-join-in 1.5s var(--ease-bouncy) both; border-color: var(--color-gold-600); background: var(--color-gold-400); }
+@keyframes party-join-in { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.94); } 12%, 82% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -8px) scale(.98); } }
+.party-player-joined { animation: party-player-joined 600ms ease-out both; }
+@keyframes party-player-joined { 0% { opacity: 0; transform: translateX(14px); box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-gold-400) 0%, transparent); } 35% { opacity: 1; transform: translateX(0); box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-gold-400) 62%); } 100% { opacity: 1; transform: translateX(0); box-shadow: 0 0 0 0 transparent; } }
 @keyframes party-event-in { 0% { opacity: 0; transform: translate(-50%, 8px); box-shadow: var(--shadow-toast); } 12% { opacity: 1; transform: translate(-50%, 0); box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-sky-400) 18%, transparent), var(--shadow-toast); } 76% { opacity: 1; box-shadow: 0 0 0 60vmax color-mix(in srgb, var(--color-sky-400) 10%, transparent), var(--shadow-toast); } 100% { opacity: 0; transform: translate(-50%, -8px); box-shadow: 0 0 0 65vmax transparent, var(--shadow-toast); } }
-@media (prefers-reduced-motion: reduce) { .party-event-toast.is-visible { animation: none; opacity: 1; transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .party-event-toast.is-visible { animation: none; opacity: 1; transform: translateX(-50%); } .party-player-joined { animation: none; } }
 
 @media (max-width: 560px) {
   .party-actions { flex-direction: column; }

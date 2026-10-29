@@ -26,6 +26,21 @@ export const raceProgressPercent = (distance, leaderDistance) => leaderDistance 
   ? clamp((Math.max(0, Number(distance) || 0) / leaderDistance) * 100, 0, 100)
   : 0;
 export const roomShareUrl = (code) => `https://malabarrunner28.netlify.app/?room=${encodeURIComponent(String(code || '').toUpperCase())}`;
+export function collectLobbyJoins(room, playerId, state) {
+  if (!room?.code || !Array.isArray(room.players)) return [];
+  if (state.roomCode !== room.code) {
+    state.roomCode = room.code;
+    state.playerIds = new Set(room.players.map((player) => player.id));
+    return [];
+  }
+  const joined = [];
+  for (const player of room.players) {
+    if (state.playerIds.has(player.id)) continue;
+    state.playerIds.add(player.id);
+    if (player.id !== playerId && room.phase === 'lobby') joined.push(player);
+  }
+  return joined;
+}
 
 export class PartyRace {
   constructor(game, root) {
@@ -34,6 +49,8 @@ export class PartyRace {
     this.playerId = this._getPlayerId();
     this.room = null;
     this.roomCode = null;
+    this._knownRoomPlayers = { roomCode: null, playerIds: new Set() };
+    this._joinHighlightIds = new Set();
     this.finishedForRoom = null;
     this.apiReady = false;
     this._progressPending = false;
@@ -627,6 +644,11 @@ export class PartyRace {
 
   _updateRoom(room) {
     if (!room) return;
+    const newLobbyPlayers = collectLobbyJoins(room, this.playerId, this._knownRoomPlayers);
+    if (newLobbyPlayers.length) {
+      this._joinHighlightIds = new Set(newLobbyPlayers.map((player) => player.id));
+      this._showJoinCelebration(newLobbyPlayers);
+    }
     if (room.lastEvent?.id && room.lastEvent.id !== this.lastPartyEventId) {
       this.lastPartyEventId = room.lastEvent.id;
       this._showPartyEvent(room.lastEvent);
@@ -642,7 +664,8 @@ export class PartyRace {
     this._renderBoard(room);
     if (room.phase === 'lobby') {
       this.board.classList.add('hidden');
-      this._renderRoster(this.rosterEl, room);
+      this._renderRoster(this.rosterEl, room, false, this._joinHighlightIds);
+      this._joinHighlightIds.clear();
       const isHost = this.playerId === room.hostId;
       const start = this.rootEl.querySelector('[data-start]');
       start.classList.toggle('hidden', !isHost);
@@ -757,7 +780,7 @@ export class PartyRace {
     this.game.startPartyRace?.({ seed: this.room.seed, round: this.room.round });
   }
 
-  _renderRoster(container, room, results = false) {
+  _renderRoster(container, room, results = false, highlightedIds = new Set()) {
     const isFinal = room.phase === 'gameover';
     const roundScore = room.roundResults?.find((entry) => entry.round === room.round)?.standings || [];
     const roundByPlayer = new Map(roundScore.map((entry) => [entry.playerId, entry]));
@@ -775,6 +798,8 @@ export class PartyRace {
     container.replaceChildren(...players.map((player, index) => {
       const row = document.createElement('div');
       row.className = results ? 'party-result' : 'party-player';
+      row.dataset.playerId = player.id;
+      if (!results && highlightedIds.has(player.id)) row.classList.add('party-player-joined');
       if (results) {
         const name = document.createElement('strong');
         name.textContent = `${index + 1}. ${player.name}${player.id === this.playerId ? ' (you)' : ''}`;
@@ -998,6 +1023,22 @@ export class PartyRace {
     clearTimeout(this.partyEventTimer);
     this.partyEventTimer = setTimeout(() => this.partyEventToast.classList.remove('is-visible'), 1300);
     if (event.playerId !== this.playerId || event.action !== 'boost') this.game.audio?.play?.('powerup');
+  }
+
+  _showJoinCelebration(players) {
+    const names = players.map((player) => player.name).filter(Boolean);
+    const joined = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
+    this.partyEventToast.textContent = `✨ ${joined || 'A new player'} joined the race!`;
+    this.partyEventToast.classList.remove('is-visible');
+    this.partyEventToast.classList.add('is-join-celebration');
+    void this.partyEventToast.offsetWidth;
+    this.partyEventToast.classList.add('is-visible');
+    clearTimeout(this.partyEventTimer);
+    this.partyEventTimer = setTimeout(() => {
+      this.partyEventToast.classList.remove('is-visible', 'is-join-celebration');
+    }, 1500);
+    this.game.audio?.play?.('join_chime');
+    this.game.ui?.particles?.burst?.(10);
   }
 
   _ensureRemoteAvatars(room) {
